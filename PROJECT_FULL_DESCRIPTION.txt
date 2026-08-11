@@ -1,0 +1,868 @@
+================================================================================
+LIFE OS — ПОЛНОЕ ОПИСАНИЕ ПРОЕКТА
+(текстовая спецификация для передачи в другие нейросети / разработчикам)
+================================================================================
+Дата среза: 2026-08-11
+Репозиторий: «Новый трекер» (package name: life-os, version 0.1.0)
+Язык UI: русский
+Архитектура: клиентский SPA без бэкенда и без React Router
+
+--------------------------------------------------------------------------------
+1. ЧТО ЭТО ЗА ПРОДУКТ
+--------------------------------------------------------------------------------
+
+Life OS — веб-приложение «операционная система жизни»: трекер привычек, целей,
+квест-контрактов, планировщика задач, рабочего стола с виджетами/мудбордом,
+колеса баланса («Карта жизни») и аналитики прогресса.
+
+Центральная метафора:
+- привычки = ежедневные отметки (completions по датам);
+- цели = измеримый результат + связанные привычки;
+- квесты = платные контракты (алмазы), порождающие привычку/список пунктов;
+- алмазы = внутренняя валюта (мягкий лимит на перегрузку);
+- Pro-подписка = булевый флаг (без реальной оплаты), открывает Цели / Квесты / Карту жизни.
+
+Всё состояние пользователя хранится в localStorage браузера. Сервера, БД,
+настоящих платежей и URL-роутинга нет.
+
+--------------------------------------------------------------------------------
+2. ТЕХНОЛОГИЧЕСКИЙ СТЕК
+--------------------------------------------------------------------------------
+
+Frontend:     React 19 + TypeScript
+Сборка:       Vite 8 (@vitejs/plugin-react), base: './' (для встраивания/iframe)
+Стили:        Tailwind CSS 4 через @tailwindcss/vite; токены в src/index.css
+Иконки:       lucide-react
+Графики:      recharts (страница Progress)
+Даты:         date-fns в зависимостях; основная дата-логика — своя в habitLogic.ts
+Линтер:       oxlint
+Шрифт:        Plus Jakarta Sans (Google Fonts в index.html)
+Backend:      НЕТ
+БД:           НЕТ (только localStorage)
+Auth:         локальный mock (SHA-256 хеш пароля + session userId)
+Роутинг:      НЕТ — переключение страниц через useState<PageId> в App.tsx
+Платежи:      фейковые (purchaseSubscription выставляет hasSubscription: true)
+Встраивание:  tilda-spa-loader.html, tilda-habit-tracker.html (отдельный vanilla-сниппет)
+
+Скрипты package.json:
+  npm run dev      — vite
+  npm run build    — tsc -b && vite build
+  npm run lint     — oxlint
+  npm run preview  — vite preview
+
+--------------------------------------------------------------------------------
+3. СТРУКТУРА РЕПОЗИТОРИЯ
+--------------------------------------------------------------------------------
+
+Корневые файлы:
+  package.json, package-lock.json, README.md
+  index.html, vite.config.ts
+  tsconfig.json, tsconfig.app.json, tsconfig.node.json
+  .oxlintrc.json, .gitignore
+  tilda-spa-loader.html, tilda-habit-tracker.html
+  PROJECT_FULL_DESCRIPTION.txt (этот файл)
+
+public/:
+  favicon.svg, icons.svg
+
+src/:
+  main.tsx          — ReactDOM.createRoot → <App />
+  App.tsx           — оболочка: auth gate, навигация, туры, офферы, страницы
+  index.css         — тема Tailwind (@theme), анимации, canvas/surface/brand
+
+  pages/            — экраны
+  components/       — UI, модалки, desktop, life-map визуалы
+  hooks/            — useAuth, useLifeOS (главный стейт ~3700 строк)
+  lib/              — доменная логика
+  data/             — типы, сиды, каталоги, шаги туров
+  assets/           — hero.png и служебные svg
+
+--------------------------------------------------------------------------------
+4. АРХИТЕКТУРА ВЗАИМОДЕЙСТВИЙ (ОБЩАЯ СХЕМА)
+--------------------------------------------------------------------------------
+
+main.tsx
+  └─ App.tsx
+       ├─ useAuth() ──────────────► lib/auth.ts ──► localStorage:
+       │                              life-os-auth-users
+       │                              life-os-auth-session
+       │
+       ├─ useLifeOS(userId) ──────► localStorage:
+       │                              life-os-habits-v12:{userId}
+       │     ├─ data/seed.ts          (типы Habit/Goal/Quest/…, PageId)
+       │     ├─ data/questCatalog.ts  (23 шаблона квестов)
+       │     ├─ data/lifeMap.ts       (8 аспектов колеса)
+       │     ├─ data/tour.ts         (FREE_TOUR_STEPS, PRO_TOUR_STEPS)
+       │     ├─ lib/habitLogic.ts
+       │     ├─ lib/goalLogic.ts
+       │     ├─ lib/questLogic.ts
+       │     ├─ lib/economy.ts
+       │     ├─ lib/mandala.ts
+       │     ├─ lib/reminders.ts
+       │     ├─ lib/retroMarks.ts
+       │     └─ lib/userQuestShare.ts (deep links ?quest= / ?questSale=)
+       │
+       ├─ pages/* (рендер по page state)
+       ├─ TourOverlay + Training/Wheel/Pro модалки
+       └─ AccountPanel (боковая панель аккаунта, не страница)
+
+Связи сущностей:
+  Привычка ←→ Цель (goalId)
+  Привычка ←→ Квест-контракт (questContractId)
+  Привычка ←→ Аспект карты жизни (lifeArea) + системная цель g-life-map-{area}
+  Привычка ←→ Матрица 9×9 (fromMatrix, matrixSlot, matrixGoalId)
+  Привычка ←→ Задача планировщика (plannerTaskId, fromPlanner)
+  Привычка ←→ Стикер мудборда (habitId на стикере)
+  Цель ←→ Стикер мудборда (goalId)
+  Стикеры ←→ стрелки (arrows) → автосвязывание habit.goalId по цепочке
+  Daily Quest (дашборд) = производное от привычек на сегодня (syncQuests)
+
+--------------------------------------------------------------------------------
+5. АВТОРИЗАЦИЯ И РЕГИСТРАЦИЯ (ОТ ВХОДА ДО СЕССИИ)
+--------------------------------------------------------------------------------
+
+Файл: src/lib/auth.ts
+Хук:  src/hooks/useAuth.ts
+UI:   src/pages/AuthPage.tsx
+
+Ключи localStorage:
+  life-os-auth-users   — массив AuthUser
+  life-os-auth-session — строка userId или отсутствует
+
+Тип AuthUser:
+  id, name, email, passwordHash, createdAt,
+  hasSubscription: boolean,
+  lifeMapOfferStatus: 'pending' | 'accepted' | 'deferred' | 'done',
+  trainingPhase?: TrainingPhase
+
+TrainingPhase:
+  'offer' | 'free_tour' | 'wheel_offer' | 'pro_offer' | 'pro_tour'
+  | 'completed' | 'skipped'
+
+PublicUser = AuthUser без passwordHash.
+
+--- Функции auth.ts ---
+
+readSessionUserId()
+  Читает SESSION_KEY из localStorage.
+
+hashPassword(password)
+  SHA-256 от строки `life-os:{password}` через crypto.subtle.
+  Возвращает hex-строку. (Локальный тест, НЕ для продакшена.)
+
+ensureOwnerAccount()
+  Если нет пользователя artem@lifeos.app — создаёт владельца:
+    id: u-owner-artem
+    name: Артём
+    password: artem123
+    hasSubscription: false
+    trainingPhase: 'completed'
+    lifeMapOfferStatus: 'pending'
+  Вызывается при регистрации/логине и при монтировании AuthPage.
+
+getSessionUser()
+  По session id находит пользователя в списке → PublicUser | null.
+
+getCurrentUserName(fallback='Гость')
+  Имя текущего пользователя или fallback.
+
+isTesterUser(user)
+  true, если user.id === 'u-owner-artem' (TESTER_USER_ID).
+
+avatarLetter(name)
+  Первая буква имени в верхнем регистре или '?'.
+
+registerUser({ name, email, password })
+  Валидация:
+    имя ≥ 2 символов
+    email по regex
+    пароль ≥ 6 символов
+    email не занят
+  Создаёт пользователя:
+    id: `u-${Date.now()}`
+    hasSubscription: false
+    lifeMapOfferStatus: 'pending'
+    trainingPhase: 'offer'
+  Пишет в users, ставит session, возвращает { ok: true, user }.
+
+loginUser({ email, password })
+  Ищет по email (lower), сверяет hashPassword.
+  При успехе пишет session.
+
+logoutUser()
+  Удаляет session key.
+
+purchaseSubscription(userId)
+  updateUser → hasSubscription: true. Оплаты нет.
+
+setLifeMapOfferStatus(userId, status)
+  Обновляет lifeMapOfferStatus.
+
+setTrainingPhase(userId, trainingPhase)
+  Обновляет trainingPhase.
+
+--- useAuth() API ---
+
+  user, isAuthenticated, hasSubscription
+  register(), login(), logout()
+  buySubscription()
+  setLifeMapOffer(status)
+  setTraining(phase)
+  refresh()
+
+--- AuthPage UI ---
+
+Режимы: register | login.
+Поля: имя (только register), email, пароль.
+Кнопки переключения режима.
+onRegistered() вызывается после успешной регистрации → App ставит
+justRegistered и page='dashboard', открывает TrainingOfferModal.
+
+OWNER demo: artem@lifeos.app / artem123 (создаётся автоматически).
+
+--------------------------------------------------------------------------------
+6. ПОСТ-РЕГИСТРАЦИОННЫЙ ОНБОРДИНГ (ОБУЧЕНИЕ)
+--------------------------------------------------------------------------------
+
+Оркестрация: App.tsx + data/tour.ts + модалки.
+
+Поток фаз:
+  1) offer          → TrainingOfferModal («пройти обучение?» / пропустить)
+  2) free_tour     → TourOverlay(FREE_TOUR_STEPS) по бесплатным разделам
+  3) wheel_offer    → BalanceWheelOfferModal (создать колесо / купить Pro / отложить)
+  4) pro_offer      → ProTourOfferModal (если есть подписка)
+  5) pro_tour      → TourOverlay(PRO_TOUR_STEPS)
+  6) completed | skipped
+
+Обработчики App.tsx:
+  startFreeTour / skipTraining
+  completeFreeTour / skipFreeTour → wheel_offer
+  createWheel(addToMoodboard) → createLifeMap(), опционально placeLifeMapOnMoodboard,
+                                page=life-map, training=pro_offer
+  buyAndCreateWheel → buySubscription + createWheel
+  deferWheel → lifeMapOffer=deferred; если Pro — pro_offer, иначе completed
+  startProTour / skipProTour / completeProTour
+  buySubscription — из AccountPanel / paywall; может открыть Pro-тур
+  restartTraining — снова offer из AccountPanel
+
+TourAction: 'go' | 'click' | 'next' | 'done'
+TourStep: id, page, target (data-tour атрибут или 'center'), title, body, cta, action
+
+FREE_TOUR_STEPS (кратко):
+  welcome → nav dashboard → desktop (add widget) → planner (add task) →
+  calendar tip → habits (add) → progress / economy → done
+
+PRO_TOUR_STEPS (кратко):
+  life-map / wheel → goals (new + matrix) → quests (create) → связи сущностей → done
+
+defaultTrainingPhase(undefined) → 'completed' (старые аккаунты без обучения).
+
+--------------------------------------------------------------------------------
+7. НАВИГАЦИЯ И ВКЛАДКИ (СТРАНИЦЫ)
+--------------------------------------------------------------------------------
+
+Нет URL-роутера. PageId в data/seed.ts:
+  'dashboard' | 'desktop' | 'planner' | 'planner-calendar' | 'habits'
+  | 'goals' | 'quests' | 'life-map' | 'progress'
+
+Desktop: Sidebar.tsx (220px), бренд Life OS, CTA подписки / бейдж Pro.
+Mobile: горизонтальный скролл-табов в App.tsx + кнопка «Выйти».
+
+Доступ:
+  Бесплатно: dashboard, desktop, planner, planner-calendar, habits, progress
+  Pro (paywall SubscriptionPaywall если !hasSubscription):
+    goals, quests, life-map
+  Pro-пункты в сайдбаре кликабельны, но показывают замок/пейволл на странице.
+
+AccountPanel — не вкладка, выезжающая панель: подписка, CTA карты жизни,
+перезапуск обучения, выход.
+
+--------------------------------------------------------------------------------
+8. ЦЕНТРАЛЬНЫЙ СТЕЙТ: useLifeOS
+--------------------------------------------------------------------------------
+
+Файл: src/hooks/useLifeOS.ts (~3739 строк)
+Ключ хранилища: life-os-habits-v12:{userId}
+Старые ключи v1…v11 очищаются (wipeOldStorage).
+
+Тип Store (персистентный):
+  year, month
+  habits: Habit[]
+  goals: Goal[]
+  quests: Quest[]                 // daily missions для дашборда
+  contracts: QuestContract[]      // купленные квест-контракты
+  userListings: UserQuestListing[]
+  claimedSaleIds: string[]
+  streak: number                  // глобальный стрик привычек
+  diamonds: number
+  diamondHistory: DiamondTx[]
+  visitStreak: number
+  lastVisitDate?: string
+  retroMarks?: RetroMarksState
+  hiddenLifeAreas?: LifeAreaId[]
+  focusSettings?: FocusSettings
+  plannerSections?: PlannerSection[]
+  plannerTasks?: PlannerTask[]
+  desktop?: DesktopState
+
+При загрузке:
+  loadStore → parseStore → normalize* → applyVisitReward → settleContracts
+Каждые 60 сек: повторный settleContracts (выигрыш/проигрыш квестов по дедлайну).
+
+Стартовый грант: ECONOMY.START_DIAMONDS = 20 (+ tx reason 'start').
+
+--- Публичный API useLifeOS (методы) ---
+
+Навигация по месяцу:
+  setMonth(year, month)
+  goToToday()
+
+Привычки:
+  toggleHabitDay(habitId, dayIndex) → { ok, reason? }
+    запрет будущих дней; ретро-отметки с лимитом; ±5 алмазов; settleContracts
+  addHabit(NewHabitInput) → { ok, reason?, habitId? }
+    цена: 10 обычная / 5 с карты жизни / 0 из матрицы; лимит 8 на аспект
+  updateHabit(habitId, UpdateHabitInput)
+  deleteHabit(habitId)
+  dayStatus(habitId, dayIndex) — обёртка над habitLogic.dayStatus
+
+Daily quests (дашборд):
+  toggleQuest(questId) — тоглит completion привычки на сегодня
+
+Квесты:
+  acceptQuest(templateId, reminderTime?) — списание cost, создание контракта+привычки
+  acceptUserQuest(listingId, reminderTime?)
+  createUserQuest(NewUserQuestInput)
+  importSharedQuest(SharedQuestPayload)
+  claimQuestSale(SaleClaimPayload) — +50% автору, защита claimedSaleIds
+  deleteUserQuest(listingId)
+  publishCatalogQuest(templateId) — опубликовать шаблон каталога как свой listing для шаринга
+  setQuestReminder(habitId, reminderTime)
+  updateQuestListItem(contractId, itemId, patch)
+  abandonQuest(contractId)
+  markYesterdayMissed() — массовая отметка вчерашних пропусков (с ретро-лимитом)
+
+Цели:
+  addGoal(NewGoalInput) — стоимость GOAL_COST=15
+  createMatrixGoal({ core, pillars... }) — MATRIX_COST=20 + syncMatrixHabits
+  setMatrixPillar(goalId, pillarIndex, title)
+  updateGoalMatrix(goalId, matrix)
+  updateGoal(goalId, patch)
+  rescheduleGoal(goalId, scheduledFor)
+  logGoalValue(goalId, value, note?) — чек-ин числа
+  completeGoalStage / toggleGoalStage
+  setGoalStatus(id, status)
+  deleteGoal(id) — системные life-map цели защищены
+  linkHabitToGoal(habitId, goalId | null)
+  createLifeMap() — создаёт системные цели 8 аспектов + LIFE_GOALS_MAP_ID
+  toggleHideLifeArea(areaId)
+
+Планировщик:
+  setFocusProfile('gentle'|'balanced'|'deep')
+  addPlannerSection / movePlannerSection
+  addPlannerTask(NewPlannerTaskInput) — создаёт задачу И связанную привычку
+  movePlannerTask / togglePlannerTaskDone / deletePlannerTask
+  reschedulePlannerTask / rescheduleHabit
+
+Desktop / moodboard:
+  addDesktopWidget / removeDesktopWidget / moveDesktopWidget / setDesktopWidgetSize
+  addDesktopSticker / updateDesktopSticker / deleteDesktopSticker
+  convertDesktopStickerToGoal / convertDesktopStickerToHabit
+  convertMoodboardGoalChildrenToHabits
+  addDesktopArrow / updateDesktopArrow / deleteDesktopArrow
+  updateDesktopMoodboardView({ panX, panY, zoom })
+
+Тестер:
+  addTesterDiamonds(amount) — только userId === u-owner-artem
+
+--- Производные поля (computed) ---
+
+  habits / habitStats — с % месяца, стриком, formPct, attention*
+  habitsAll — все нормализованные
+  goals, goalStats, lifeMapGoalStats, customGoalStats
+  lifeGoalsMapGoal, lifeGoalsMapStat, hasLifeMap
+  hiddenLifeAreas, visibleLifeAreas
+  quests, nextQuest, contracts, userListings, activeContracts
+  retrofillStatus, yesterdayMissed, habitReminders
+  plannerSections, plannerTasks, plannerTasksDetailed
+  todayPlannerTasks, focusSettings, todayFocusBlocks, focusLoadPct
+  dayCount, todayIndex, isCurrentMonth
+  todayDone, todayTotal, todayPct
+  monthDone, monthTotal, monthPct
+  weakHabits, dailyProgress, warnings, streak, diamonds, …
+
+--------------------------------------------------------------------------------
+9. МОДЕЛИ ДАННЫХ (data/seed.ts)
+--------------------------------------------------------------------------------
+
+Habit:
+  id, name, emoji
+  completions: Record<YYYY-MM-DD, boolean>
+  priority: 'important' | 'urgent' | 'low'
+  targetDays: 7|21|30|66|90|100|365
+  startDate, timesPerWeek, createdAt
+  goalId?, questContractId?, reminderTime?
+  fromMatrix?, matrixGoalId?, matrixSlot?
+  lifeArea?, plannerTaskId?, fromPlanner?
+
+Goal:
+  id, title, note?, status: active|done|paused
+  createdAt, scheduledFor?, scheduledTime?
+  measureKind: none|number|stages|matrix
+  unit?, startValue?, targetValue?, currentValue?
+  stages?, cadence?, checkIns?, lastCheckInAt?
+  matrix?: { core, pillars[8], habits[8][8] }
+  lifeArea?, fromLifeMap?
+
+Quest (daily, не путать с контрактом):
+  id, title, minutes, habitId?, done, xp
+
+QuestContract:
+  шаблонные поля + status active|won|lost|abandoned
+  cost, reward (=cost*2 для каталога), habitId, deadline
+  kind streak|list, listItems, fromUserListing?, listingId?
+
+UserQuestListing:
+  shareCode, price, reward, salesCount, earnedDiamonds, isMine, authorName, …
+
+PRIORITY_OPTIONS / DURATION_OPTIONS — метаданные для форм.
+MONTH_NAMES, WEEKDAYS — локализация RU.
+USER — устаревший демо-объект (level/rank/xp), имя берётся из auth.
+
+--------------------------------------------------------------------------------
+10. ЭКОНОМИКА АЛМАЗОВ (lib/economy.ts)
+--------------------------------------------------------------------------------
+
+ECONOMY:
+  START_DIAMONDS: 20
+  HABIT_COST: 10
+  LIFE_MAP_HABIT_COST: 5
+  GOAL_COST: 15
+  MATRIX_COST: 20
+  DAY_REWARD: 5
+  VISIT_STREAK_DAYS: 7, VISIT_STREAK_BONUS: 50
+  QUEST_COSTS: [20, 30, 50]
+  QUEST_CREATOR_CUT: 0.5
+  USER_QUEST_PRICE_MIN: 10, USER_QUEST_PRICE_MAX: 200
+
+Награда за выигрыш контракта каталога: cost * 2 (questContractReward).
+Доля автора продажи user-квеста: floor(price * 0.5).
+
+DiamondTxReason:
+  start | day_mark | day_unmark | habit_create | life_map_habit
+  | goal_create | matrix_create | quest_accept | quest_win
+  | quest_creator_sale | visit_streak | friend_grant | tester_grant
+
+Хелперы: diamondsWord, formatDiamonds, canAfford, *CostHint, makeDiamondTx,
+pushDiamondTx (лимит истории 100), formatTxAmount, formatTxTime.
+
+Visit streak: при заходе в приложение подряд 7 дней → +50 алмазов (applyVisitReward).
+
+--------------------------------------------------------------------------------
+11. ЛОГИКА ПРИВЫЧЕК (lib/habitLogic.ts)
+--------------------------------------------------------------------------------
+
+Даты: toDateKey, parseDateKey, addDays, todayKey, compareKeys (локальное время).
+
+Планирование срока:
+  baseCalendarSpan(targetDays, timesPerWeek) = ceil(targetDays * 7 / f)
+  baseEndDate / effectiveEndDate — конец с учётом пропусков (countMisses)
+  Пропуски продлевают срок: «нейроны не срастутся» без ритма.
+
+Статусы дня (dayStatus): before | after | active | done | missed | future
+
+Активность:
+  isActiveToday — стартовала, не сформирована, до effectiveEnd
+  isDueToday / isDueOnDate — нужно ли выполнить с учётом timesPerWeek
+  isFormed — completedCount >= targetDays
+  isVisibleInMonth — пересечение [start, end] с месяцем
+
+Статистика:
+  currentStreak, monthDaysArray, weekPlanStats, elapsedStats
+  buildWarnings — предупреждения «сегодня не отмечено» / «вчера пропуск»
+
+--------------------------------------------------------------------------------
+12. РЕТРО-ОТМЕТКИ (lib/retroMarks.ts)
+--------------------------------------------------------------------------------
+
+RETRO_MAX_PER_MONTH = 5
+RETRO_BLOCK_DAYS = 30
+
+После 5 отметок прошлых дней в месяце — блокировка на 30 суток.
+Функции: normalizeRetroMarks, retrofillInfo, consumeRetrofill, retroConfirmMessage.
+Используется в toggleHabitDay и markYesterdayMissed (дашборд).
+
+--------------------------------------------------------------------------------
+13. НАПОМИНАНИЯ (lib/reminders.ts)
+--------------------------------------------------------------------------------
+
+isReminderDue(HH:mm) — true, если текущее время ≥ напоминания.
+formatReminderTime — нормализация HH:mm.
+На дашборде habitReminders показывают просроченные ритуалы квестов.
+
+--------------------------------------------------------------------------------
+14. ЛОГИКА ЦЕЛЕЙ (lib/goalLogic.ts)
+--------------------------------------------------------------------------------
+
+goalResultProgress(g):
+  number — (current-start)/(target-start)*100
+  stages — доля done
+  matrix — эвристика заполнения таблицы (не отметки привычек)
+  none → null (тогда прогресс из привычек)
+
+formatGoalMetric, cadenceLabel, needsCheckIn (daily/weekly/anytime),
+nextOpenStage, makeStage, makeCheckIn.
+
+В goalStats итог progress = resultProgress ?? habitProgress.
+
+--------------------------------------------------------------------------------
+15. МАТРИЦА / МАНДАЛА 9×9 (lib/mandala.ts)
+--------------------------------------------------------------------------------
+
+Структура: core (центр) + 8 pillars + 8×8 слотов привычек.
+PILLAR_LABELS / PILLAR_COLORS, emptyMatrix, normalizeMatrix,
+blockOrigin, centerRingLocal, HABIT_LOCAL_SLOTS,
+cellAt (kind), habitSlotKey(`h-{pillar}-{habit}`),
+filledHabitTitles, matrixProgress, MATRIX_EMOJIS.
+
+createMatrixGoal списывает 20 алмазов и создаёт бесплатные привычки из заполненных
+ячеек (fromMatrix=true). syncMatrixHabits поддерживает синхронизацию.
+
+Системная карта целей LIFE_GOALS_MAP_ID = 'g-life-goals-map' синхронизирует
+привычки по lifeArea в слоты мандалы (syncLifeGoalsMapHabits).
+
+--------------------------------------------------------------------------------
+16. КВЕСТЫ (каталог + контракты)
+--------------------------------------------------------------------------------
+
+data/questCatalog.ts — 23 шаблона, категории:
+  sport, mind, books, health, home, money, growth
+
+Цены 20 / 30 / 50. Награда = cost (через questReward; в контракте reward=×2 от cost
+через questContractReward при создании из шаблона).
+
+Примеры шаблонов (id):
+  20: plank-30, water-30, gratitude-30, order-20min, selfcare-21, sleep-30,
+      detox-14, zozh-7
+  30: meditation-100, creativity-21, yoga-30, run-30, mindful-30,
+      books-10, docs-10, investor-30
+  50: year-books-10, no-buy-100, gratitude-100, sport-year, lifelong-learn,
+      books-60, checklist-365
+
+Виды: streak (отмечать дни привычки) | list (отмечать пункты списка).
+
+lib/questLogic.ts:
+  toHabitDuration, contractDeadline, makeListSlots
+  createContractFromTemplate / createContractFromUserListing
+  contractProgress, resolveContractStatus (won если target достигнут;
+    lost если overdue), listLabelWord, formatDurationLabel
+
+settleContracts в useLifeOS: при переходе active→won начисляет reward.
+
+Пользовательские квесты:
+  create → UserQuestListing со shareCode
+  share URL: ?quest=<base64url payload>
+  покупка другом → контракт; чек продажи ?questSale= → claimQuestSale (+50% автору)
+  publishCatalogQuest — шаринг шаблона каталога как listing
+
+--------------------------------------------------------------------------------
+17. КАРТА ЖИЗНИ / КОЛЕСО БАЛАНСА (data/lifeMap.ts)
+--------------------------------------------------------------------------------
+
+8 аспектов (по часовой с верха):
+  health, family, friends, career, finance, spirit, growth, joy
+
+LIFE_AREA_MAX_HABITS = 8
+Оценка сектора = число привычек в аспекте (0…8).
+
+Системные цели:
+  g-life-map-{areaId} — по одной на аспект (fromLifeMap, бесплатны)
+  g-life-goals-map — матрица «карта целей» под колесом
+
+createLifeMap() создаёт все системные цели.
+Привычка с карты жизни: fromLifeMap → цена 5 алмазов, привязка lifeArea + goalId.
+
+UI: LifeMapPage + LifeWheel + LifeMapGoalsTable + LifeGoalsMap.
+Скрыть аспект: toggleHideLifeArea.
+
+--------------------------------------------------------------------------------
+18. ОПИСАНИЕ КАЖДОЙ ВКЛАДКИ / СТРАНИЦЫ
+--------------------------------------------------------------------------------
+
+### 18.1 AuthPage (вне навигации)
+Регистрация / вход. После входа — App shell.
+
+### 18.2 Dashboard (dashboard) — БЕСПЛАТНО
+Файл: pages/Dashboard.tsx
+Назначение: хаб дня.
+
+Содержимое:
+  - Header: приветствие по времени суток, стрик, алмазы, visitStreak
+  - Следующий шаг (nextQuest) — кнопка toggleQuest
+  - Прогресс дня todayPct / todayDone/todayTotal
+  - Список daily quests (из привычек на сегодня)
+  - Задачи планировщика на сегодня (todayPlannerTasks)
+  - Активная цель + связанные квесты дня
+  - Warnings (пропуски / не отмечено)
+  - Напоминания habitReminders
+  - «Отметить вчерашние пропуски» → markYesterdayMissed
+  - Подсказка про экономику алмазов (можно скрыть → localStorage)
+  - CTA отложенной карты жизни (если deferred)
+  - Для тестера: модалка addTesterDiamonds
+  - Навигация к другим разделам
+
+Взаимодействует с: useLifeOS (quests, habits, goals, planner, diamonds),
+Header, economy, retroMarks.
+
+### 18.3 Desktop / Рабочий стол (desktop) — БЕСПЛАТНО
+Файл: pages/Desktop.tsx + components/desktop/*
+
+Сетка виджетов DesktopGrid / WidgetCard.
+Типы виджетов: habits | goals | planner | moodboard | dashboard | quests |
+life-map | progress (в библиотеке UI сейчас акцент на habits/goals/planner/moodboard).
+Размеры: minimal | medium | large.
+
+Мудборд (MoodboardWidget):
+  бесконечная доска (pan/zoom), стикеры note|goal|habit,
+  стрелки между стикерами,
+  конвертация стикера в цель/привычку,
+  связывание habit↔goal через стрелки (syncHabitLinkFromGoalArrow),
+  placeOnMoodboard.ts — вынос карты жизни / сущностей на доску.
+
+Модалки: AddWidgetModal, WidgetLibrary, StickerEditModal,
+DeleteLinkedStickerModal.
+
+### 18.4 Planner / Планировщик (planner) — БЕСПЛАТНО
+Файл: pages/Planner.tsx
+
+Kanban-секции (PlannerSection) и задачи (PlannerTask).
+Создание задачи → автоматически создаётся связанная Habit
+(energy, focusBlocks, timesPerWeek, targetDays, priority).
+
+Focus-профили Pomodoro-подобные:
+  gentle:  15/5/15, cap 6
+  balanced: 25/5/20, cap 8
+  deep:    (более жёсткий профиль в коде)
+
+Таймер фокус-сессий на задаче (локальный UI state).
+StepWizard — пошаговое создание задачи.
+Можно перейти в календарь.
+
+Взаимодействует с: habits (через habitId), calendar, dashboard (today tasks).
+
+### 18.5 Planner Calendar / Календарь (planner-calendar) — БЕСПЛАТНО
+Файл: pages/PlannerCalendar.tsx
+
+Виды: день / неделя / месяц.
+Показывает задачи, привычки, цели с датами.
+Drag/перенос: moveItemToDate → reschedulePlannerTask / rescheduleHabit / rescheduleGoal.
+Навигация по месяцам через state.setMonth.
+
+### 18.6 Habits / Привычки (habits) — БЕСПЛАТНО
+Файл: pages/Habits.tsx
+
+Месячная сетка отметок по всем видимым привычкам.
+Переключение месяца prev/next.
+Клик по дню → toggleHabitDay (с подтверждением ретро).
+HabitFormModal: создание/редактирование (имя, emoji, priority, duration,
+timesPerWeek, startDate, reminder).
+Удаление привычки.
+Показ силы/прогресса формирования, стриков.
+
+Стоимость создания: 10 алмазов (если не matrix/life-map).
+
+### 18.7 Goals / Цели (goals) — PRO
+Файл: pages/Goals.tsx + SubscriptionPaywall
+
+CRUD обычных целей (GoalFormModal): measure none/number/stages, cadence.
+Чек-ины GoalCheckInModal.
+Привязка привычек AttachHabitModal.
+Матрица MandalaMatrixModal (createMatrixGoal).
+Карточки GoalCard с progress / metric / needsCheckIn.
+Блок системной карты жизни / колеса.
+
+Стоимости: цель 15, матрица 20; привычки из матрицы бесплатны.
+
+### 18.8 Quests / Квесты (quests) — PRO
+Файл: pages/Quests.tsx
+
+Вкладки/фильтры: каталог, мои контракты, user listings.
+AcceptQuestModal / AcceptUserQuestModal.
+CreateUserQuestModal, ShareUserQuestModal, SaleClaimShareModal.
+Принятие → контракт + привычка, −cost алмазов.
+Победа → +reward; проигрыш по дедлайну; abandon.
+Deep-link импорт shared / claim sale (из App при логине).
+Список пунктов для kind=list (updateQuestListItem).
+
+### 18.9 Life Map / Карта жизни (life-map) — PRO
+Файл: pages/LifeMap.tsx
+
+Если карты нет — экран создания (createLifeMap / buyAndCreate).
+Колесо LifeWheel: клик по сектору → HabitFormModal с fromLifeMap.
+Таблица целей аспектов LifeMapGoalsTable.
+Карта целей LifeGoalsMap (мандала системная).
+Скрытие аспектов.
+
+### 18.10 Progress / Прогресс (progress) — БЕСПЛАТНО
+Файл: pages/Progress.tsx
+
+Метрики месяца: отметок, %, алмазы, активных привычек.
+AreaChart dailyProgress (recharts).
+Авто-инсайты: лучшая привычка, слабая, monthPct.
+История алмазов (список DiamondTx).
+ProgressBar по каждой привычке.
+
+Также история алмазов доступна из Header → DiamondHistoryModal.
+
+--------------------------------------------------------------------------------
+19. КОМПОНЕНТЫ UI (НАЗНАЧЕНИЕ)
+--------------------------------------------------------------------------------
+
+Shell:
+  Header — greeting, streak, diamonds (клик → история), visitStreak
+  Sidebar — навигация + Pro CTA
+  AccountPanel — аккаунт / подписка / обучение / logout
+  ui.tsx — Card, ProgressBar, ProgressRing
+  SubscriptionPaywall — пейволл Pro-фич
+  DiamondHistoryModal
+  StepWizard — мультишаговый визард
+
+Онбординг:
+  TrainingOfferModal, BalanceWheelOfferModal, ProTourOfferModal
+  LifeMapOfferModal (альтернативный/старый оффер)
+  TourOverlay — подсветка data-tour + боковая подсказка
+
+Привычки/цели/квесты:
+  HabitFormModal, GoalFormModal, GoalCheckInModal, AttachHabitModal
+  MandalaMatrixModal
+  AcceptQuestModal, AcceptUserQuestModal
+  CreateUserQuestModal, ShareUserQuestModal, SaleClaimShareModal
+
+Карта жизни:
+  LifeWheel, LifeGoalsMap, LifeMapGoalsTable
+
+Desktop:
+  DesktopGrid, WidgetCard, WidgetLibrary, AddWidgetModal
+  MoodboardWidget, StickerEditModal, DeleteLinkedStickerModal
+  moodboardUtils.ts, placeOnMoodboard.ts
+
+--------------------------------------------------------------------------------
+20. ШАРИНГ КВЕСТОВ (lib/userQuestShare.ts)
+--------------------------------------------------------------------------------
+
+SharedQuestPayload v1 — полные поля listing для друга.
+SaleClaimPayload v1 — claimId, shareCode, title, cut, buyerName, at.
+
+Кодирование: JSON → UTF-8 → base64url.
+URL:
+  buildShareUrl → ?quest=
+  buildSaleClaimUrl → ?questSale=
+
+readQuestDeepLink / clearQuestDeepLink — App при isAuthenticated:
+  importSharedQuest → page quests + pendingShareCode
+  claimQuestSale → notice о зачислении
+
+--------------------------------------------------------------------------------
+21. ПОЛНЫЙ ПОЛЬЗОВАТЕЛЬСКИЙ ПУТЬ «ОТ РЕГИСТРАЦИИ ДО ПРОГРЕССА»
+--------------------------------------------------------------------------------
+
+1. Открыть приложение → нет session → AuthPage.
+2. Регистрация (или вход artem@lifeos.app / artem123).
+3. Создаётся store с 20 алмазами; trainingPhase='offer'.
+4. TrainingOfferModal → старт free_tour или skip → wheel_offer.
+5. Free-тур проводит по: Дашборд → Рабочий стол → Планировщик → Календарь →
+   Привычки → Прогресс/экономика.
+6. Пользователь создаёт привычку (−10💎), отмечает дни (+5💎/день).
+7. Планировщик: задачи → привычки; календарь для расписания.
+8. Дашборд показывает next quest, прогресс дня, предупреждения.
+9. Оффер колеса: создать карту жизни (Pro) / купить подписку / отложить.
+10. Pro: карта жизни (привычки по секторам за 5💎), цели (15💎), матрица (20💎),
+    квесты (20/30/50💎, награда ×2 при победе).
+11. Pro-тур объясняет связи сущностей.
+12. Прогресс-вкладка: графики месяца, инсайты, история алмазов.
+13. Visit streak 7 дней → +50💎.
+14. Logout очищает session; данные store остаются в localStorage по userId.
+
+--------------------------------------------------------------------------------
+22. ПРАВИЛА И ИНВАРИАНТЫ ДОМЕНА
+--------------------------------------------------------------------------------
+
+- Будущие дни отмечать нельзя.
+- Пропуск продлевает effectiveEndDate (countMisses).
+- Привычка «сформирована» при completedCount >= targetDays → больше не due.
+- Макс. 8 привычек на аспект карты жизни.
+- Системные life-map цели нельзя удалить как обычные.
+- Квест settled: won → награда один раз; lost по deadline; abandon без награды.
+- Sale claim нельзя получить дважды (claimedSaleIds).
+- Ретро: 5/месяц, потом блок 30 дней.
+- Pro — только UI-гейт; данные goals/quests/life-map всё равно могут быть
+  в store, но страницы закрыты paywall.
+- Нет синхронизации между устройствами / браузерами.
+
+--------------------------------------------------------------------------------
+23. ВАЖНЫЕ КОНСТАНТЫ / ID
+--------------------------------------------------------------------------------
+
+OWNER: artem@lifeos.app / artem123 / u-owner-artem
+STORAGE: life-os-habits-v12:{userId}
+AUTH USERS: life-os-auth-users
+SESSION: life-os-auth-session
+LIFE_GOALS_MAP_ID: g-life-goals-map
+life map goals: g-life-map-{areaId}
+DIAMONDS tip hide: life-os-diamonds-tip-hidden
+Brand color (UI): #7b3fe4 (фиолетовый бренд в текущем UI)
+
+--------------------------------------------------------------------------------
+24. ЧЕГО В ПРОЕКТЕ НЕТ (ВАЖНО ДЛЯ ДРУГИХ МОДЕЛЕЙ)
+--------------------------------------------------------------------------------
+
+- Нет backend API, WebSocket, GraphQL
+- Нет настоящей оплаты / Stripe / подписки с сервером
+- Нет email-подтверждения, OAuth, восстановления пароля
+- Нет React Router / Next.js
+- Нет тестов (unit/e2e) в репозитории на момент среза
+- Нет .env конфигурации — все константы в коде
+- CircleActivity / USER.xp в seed — заготовки/легаси, не основной поток
+
+--------------------------------------------------------------------------------
+25. КАК ЗАПУСТИТЬ
+--------------------------------------------------------------------------------
+
+  npm install
+  npm run dev
+
+Сборка:
+  npm run build
+  npm run preview
+
+Встраивание в Tilda: см. tilda-spa-loader.html (подключение CSS/JS из dist
+с относительными путями благодаря base: './').
+
+--------------------------------------------------------------------------------
+26. КРАТКАЯ КАРТА ФАЙЛОВ → ОТВЕТСТВЕННОСТЬ
+--------------------------------------------------------------------------------
+
+src/main.tsx                    bootstrap
+src/App.tsx                     shell, туры, deep links, page switch
+src/hooks/useAuth.ts            React-обёртка auth
+src/hooks/useLifeOS.ts          весь доменный стейт и мутации
+src/lib/auth.ts                 пользователи/сессия/подписка/фазы
+src/lib/economy.ts              алмазы
+src/lib/habitLogic.ts           даты, стрики, due, warnings
+src/lib/goalLogic.ts            прогресс целей, чек-ины
+src/lib/questLogic.ts           контракты
+src/lib/mandala.ts              матрица 9×9
+src/lib/reminders.ts            HH:mm due
+src/lib/retroMarks.ts           лимит ретро-отметок
+src/lib/userQuestShare.ts       шаринг/продажа квестов
+src/data/seed.ts                типы и константы UI
+src/data/questCatalog.ts        23 шаблона
+src/data/lifeMap.ts             8 аспектов
+src/data/tour.ts               шаги обучения
+src/pages/*                     экраны вкладок
+src/components/*                UI/модалки/desktop/life-map
+
+================================================================================
+КОНЕЦ ДОКУМЕНТА
+================================================================================
+)

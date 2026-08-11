@@ -1,0 +1,836 @@
+<div id="af-habit-tracker"></div>
+
+<style>
+  #af-habit-tracker {
+    --bg: #f6f1ff;
+    --card: #ffffff;
+    --line: #e7ddff;
+    --text: #21163a;
+    --muted: #7a6d96;
+    --brand: #7c3aed;
+    --brand-2: #ede9fe;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --shadow: 0 18px 50px rgba(86, 46, 167, 0.12);
+    font-family: Inter, Arial, sans-serif;
+    color: var(--text);
+  }
+
+  #af-habit-tracker * {
+    box-sizing: border-box;
+  }
+
+  #af-habit-tracker .af-wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 24px;
+    border-radius: 28px;
+    background:
+      radial-gradient(circle at top right, rgba(124, 58, 237, 0.12), transparent 28%),
+      linear-gradient(180deg, #fbf9ff 0%, var(--bg) 100%);
+  }
+
+  #af-habit-tracker .af-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+
+  #af-habit-tracker h2,
+  #af-habit-tracker h3,
+  #af-habit-tracker p {
+    margin: 0;
+  }
+
+  #af-habit-tracker .af-title {
+    font-size: 34px;
+    line-height: 1.05;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+
+  #af-habit-tracker .af-subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.5;
+    max-width: 720px;
+  }
+
+  #af-habit-tracker .af-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  #af-habit-tracker .af-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+  }
+
+  #af-habit-tracker .af-stat {
+    padding: 18px 20px;
+  }
+
+  #af-habit-tracker .af-label {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  #af-habit-tracker .af-value {
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  #af-habit-tracker .af-value small {
+    font-size: 15px;
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  #af-habit-tracker .af-grid {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  #af-habit-tracker .af-panel {
+    padding: 20px;
+  }
+
+  #af-habit-tracker .af-form {
+    display: grid;
+    gap: 12px;
+  }
+
+  #af-habit-tracker .af-form-row {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 10px;
+  }
+
+  #af-habit-tracker label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  #af-habit-tracker input,
+  #af-habit-tracker select,
+  #af-habit-tracker button {
+    font: inherit;
+  }
+
+  #af-habit-tracker input,
+  #af-habit-tracker select {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 12px 14px;
+    background: #fff;
+    color: var(--text);
+    outline: none;
+  }
+
+  #af-habit-tracker input:focus,
+  #af-habit-tracker select:focus {
+    border-color: #bda7ff;
+    box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
+  }
+
+  #af-habit-tracker .af-btn {
+    border: 0;
+    border-radius: 14px;
+    padding: 13px 16px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+  }
+
+  #af-habit-tracker .af-btn:hover {
+    transform: translateY(-1px);
+  }
+
+  #af-habit-tracker .af-btn-primary {
+    background: var(--brand);
+    color: #fff;
+  }
+
+  #af-habit-tracker .af-btn-secondary {
+    background: var(--brand-2);
+    color: var(--brand);
+  }
+
+  #af-habit-tracker .af-habits {
+    display: grid;
+    gap: 14px;
+  }
+
+  #af-habit-tracker .af-habit {
+    padding: 18px;
+  }
+
+  #af-habit-tracker .af-habit-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+
+  #af-habit-tracker .af-habit-name {
+    font-size: 20px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  #af-habit-tracker .af-habit-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  #af-habit-tracker .af-badge {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #f5f3ff;
+    color: #5b38b0;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  #af-habit-tracker .af-progress {
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: #f0ebff;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  #af-habit-tracker .af-progress > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #8b5cf6 0%, #22c55e 100%);
+  }
+
+  #af-habit-tracker .af-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+
+  #af-habit-tracker .af-days {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+    gap: 8px;
+  }
+
+  #af-habit-tracker .af-day {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0;
+  }
+
+  #af-habit-tracker .af-day:hover {
+    border-color: #bda7ff;
+  }
+
+  #af-habit-tracker .af-day.is-done {
+    background: var(--success);
+    border-color: var(--success);
+    color: #fff;
+  }
+
+  #af-habit-tracker .af-day.is-missed {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #b91c1c;
+  }
+
+  #af-habit-tracker .af-day.is-future,
+  #af-habit-tracker .af-day.is-out {
+    background: #f8f6ff;
+    color: #b1a6ca;
+    cursor: default;
+  }
+
+  #af-habit-tracker .af-day.is-today {
+    box-shadow: inset 0 0 0 2px var(--brand);
+  }
+
+  #af-habit-tracker .af-delete {
+    background: transparent;
+    border: 0;
+    color: #a99dca;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  #af-habit-tracker .af-delete:hover {
+    color: var(--danger);
+  }
+
+  #af-habit-tracker .af-empty {
+    padding: 34px 20px;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  #af-habit-tracker .af-monthbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 10px 0 18px;
+  }
+
+  #af-habit-tracker .af-monthbar .af-month-title {
+    flex: 1;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--text);
+  }
+
+  #af-habit-tracker .af-icon-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: #fff;
+    cursor: pointer;
+    color: var(--brand);
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  #af-habit-tracker .af-icon-btn:hover {
+    border-color: #bda7ff;
+  }
+
+  @media (max-width: 960px) {
+    #af-habit-tracker .af-grid {
+      grid-template-columns: 1fr;
+    }
+
+    #af-habit-tracker .af-stats {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    #af-habit-tracker .af-wrap {
+      padding: 16px;
+      border-radius: 20px;
+    }
+
+    #af-habit-tracker .af-head {
+      flex-direction: column;
+    }
+
+    #af-habit-tracker .af-title {
+      font-size: 28px;
+    }
+  }
+</style>
+
+<script>
+  (function () {
+    var root = document.getElementById('af-habit-tracker');
+    if (!root) return;
+
+    var STORAGE_KEY = 'af-tilda-habit-tracker-v1';
+
+    function toDateKey(date) {
+      var y = date.getFullYear();
+      var m = String(date.getMonth() + 1).padStart(2, '0');
+      var d = String(date.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + d;
+    }
+
+    function parseDateKey(key) {
+      var parts = key.split('-').map(Number);
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    function addDays(key, days) {
+      var d = parseDateKey(key);
+      d.setDate(d.getDate() + days);
+      return toDateKey(d);
+    }
+
+    function compareKeys(a, b) {
+      return a < b ? -1 : a > b ? 1 : 0;
+    }
+
+    function todayKey() {
+      return toDateKey(new Date());
+    }
+
+    function eachDay(from, to) {
+      if (compareKeys(from, to) > 0) return [];
+      var out = [];
+      var current = from;
+      while (compareKeys(current, to) <= 0) {
+        out.push(current);
+        current = addDays(current, 1);
+      }
+      return out;
+    }
+
+    function weekStartMonday(key) {
+      var d = parseDateKey(key);
+      var jsDay = d.getDay();
+      var offset = jsDay === 0 ? 6 : jsDay - 1;
+      d.setDate(d.getDate() - offset);
+      return toDateKey(d);
+    }
+
+    function baseCalendarSpan(targetDays, timesPerWeek) {
+      var freq = Math.min(7, Math.max(1, timesPerWeek));
+      return Math.max(1, Math.ceil((targetDays * 7) / freq));
+    }
+
+    function countMisses(habit, asOf) {
+      var start = habit.startDate;
+      var yesterday = addDays(asOf, -1);
+      if (compareKeys(yesterday, start) < 0) return 0;
+
+      var freq = Math.min(7, Math.max(1, habit.timesPerWeek));
+      if (freq >= 7) {
+        var dailyMisses = 0;
+        eachDay(start, yesterday).forEach(function (day) {
+          if (!habit.completions[day]) dailyMisses += 1;
+        });
+        return dailyMisses;
+      }
+
+      var misses = 0;
+      var cursor = weekStartMonday(start);
+      var lastWeek = weekStartMonday(yesterday);
+
+      while (compareKeys(cursor, lastWeek) <= 0) {
+        var weekEnd = addDays(cursor, 6);
+        var rangeStart = compareKeys(start, cursor) > 0 ? start : cursor;
+        var rangeEnd = compareKeys(yesterday, weekEnd) < 0 ? yesterday : weekEnd;
+        var daysInRange = eachDay(rangeStart, rangeEnd);
+        if (daysInRange.length) {
+          var expected = Math.min(freq, daysInRange.length, habit.targetDays);
+          var done = daysInRange.filter(function (day) {
+            return !!habit.completions[day];
+          }).length;
+          misses += Math.max(0, expected - done);
+        }
+        cursor = addDays(cursor, 7);
+      }
+
+      return misses;
+    }
+
+    function effectiveEndDate(habit) {
+      var baseEnd = addDays(
+        habit.startDate,
+        baseCalendarSpan(habit.targetDays, habit.timesPerWeek) - 1
+      );
+      return addDays(baseEnd, countMisses(habit, todayKey()));
+    }
+
+    function completedCount(habit) {
+      return Object.keys(habit.completions).filter(function (key) {
+        return !!habit.completions[key];
+      }).length;
+    }
+
+    function currentStreak(habit) {
+      var today = todayKey();
+      var streak = 0;
+      var current = today;
+
+      if (compareKeys(current, habit.startDate) < 0) return 0;
+      if (!habit.completions[current]) current = addDays(current, -1);
+
+      while (compareKeys(current, habit.startDate) >= 0) {
+        if (!habit.completions[current]) break;
+        streak += 1;
+        current = addDays(current, -1);
+      }
+
+      return streak;
+    }
+
+    function dayStatus(habit, dateKey) {
+      var end = effectiveEndDate(habit);
+      var today = todayKey();
+      if (compareKeys(dateKey, habit.startDate) < 0) return 'out';
+      if (compareKeys(dateKey, end) > 0) return 'out';
+      if (compareKeys(dateKey, today) > 0) return 'future';
+      if (habit.completions[dateKey]) return 'done';
+      if (compareKeys(dateKey, today) < 0) return 'missed';
+      return 'active';
+    }
+
+    function formatDate(key) {
+      return parseDateKey(key).toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'short'
+      });
+    }
+
+    function monthName(date) {
+      return date.toLocaleDateString('ru-RU', {
+        month: 'long',
+        year: 'numeric'
+      });
+    }
+
+    function uid() {
+      return 'habit-' + Math.random().toString(36).slice(2, 10);
+    }
+
+    function loadState() {
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function sampleHabits() {
+      var today = todayKey();
+      return [
+        {
+          id: uid(),
+          name: 'Вода утром',
+          emoji: '💧',
+          targetDays: 21,
+          timesPerWeek: 7,
+          startDate: today,
+          completions: {}
+        },
+        {
+          id: uid(),
+          name: 'Английский 15 минут',
+          emoji: '🇬🇧',
+          targetDays: 30,
+          timesPerWeek: 5,
+          startDate: today,
+          completions: {}
+        }
+      ];
+    }
+
+    var state = loadState() || { habits: sampleHabits() };
+
+    var view = (function () {
+      var n = new Date();
+      return { year: n.getFullYear(), month: n.getMonth() };
+    })();
+
+    function monthTitle(year, month) {
+      // month: 0..11
+      return new Date(year, month, 1).toLocaleDateString('ru-RU', {
+        month: 'long',
+        year: 'numeric',
+      });
+    }
+
+    function totals() {
+      var done = 0;
+      var target = 0;
+      var bestStreak = 0;
+
+      state.habits.forEach(function (habit) {
+        done += completedCount(habit);
+        target += habit.targetDays;
+        bestStreak = Math.max(bestStreak, currentStreak(habit));
+      });
+
+      return {
+        done: done,
+        target: target,
+        pct: target ? Math.round((done / target) * 100) : 0,
+        streak: bestStreak
+      };
+    }
+
+    function toggleHabitDay(habitId, dateKey) {
+      var changed = false;
+      state.habits = state.habits.map(function (habit) {
+        if (habit.id !== habitId) return habit;
+        var status = dayStatus(habit, dateKey);
+        if (status === 'future' || status === 'out') return habit;
+
+        var completions = Object.assign({}, habit.completions);
+        var didChange = false;
+
+        if (completions[dateKey]) {
+          delete completions[dateKey];
+          didChange = true;
+        } else if (completedCount(habit) < habit.targetDays) {
+          completions[dateKey] = true;
+          didChange = true;
+        }
+
+        if (!didChange) return habit;
+        changed = true;
+        return Object.assign({}, habit, { completions: completions });
+      });
+
+      if (changed) {
+        saveState();
+        render();
+      }
+    }
+
+    function deleteHabit(habitId) {
+      state.habits = state.habits.filter(function (habit) {
+        return habit.id !== habitId;
+      });
+      saveState();
+      render();
+    }
+
+    function addHabit(form) {
+      var name = form.querySelector('[name="name"]').value.trim();
+      var emoji = form.querySelector('[name="emoji"]').value.trim() || '✨';
+      var targetDays = Number(form.querySelector('[name="targetDays"]').value);
+      var timesPerWeek = Number(form.querySelector('[name="timesPerWeek"]').value);
+      var startDate = form.querySelector('[name="startDate"]').value || todayKey();
+
+      if (!name) {
+        alert('Введите название привычки');
+        return;
+      }
+
+      state.habits.unshift({
+        id: uid(),
+        name: name,
+        emoji: emoji,
+        targetDays: targetDays,
+        timesPerWeek: timesPerWeek,
+        startDate: startDate,
+        completions: {}
+      });
+
+      saveState();
+      form.reset();
+      form.querySelector('[name="startDate"]').value = todayKey();
+      render();
+    }
+
+    function renderHabit(habit, year, month) {
+      var daysInMonth = new Date(year, month + 1, 0).getDate();
+      var done = completedCount(habit);
+      var pct = Math.min(100, Math.round((done / habit.targetDays) * 100));
+      var streak = currentStreak(habit);
+      var endDate = effectiveEndDate(habit);
+
+      var daysHtml = '';
+      for (var day = 1; day <= daysInMonth; day += 1) {
+        var key = toDateKey(new Date(year, month, day));
+        var status = dayStatus(habit, key);
+        var classes = ['af-day'];
+        if (status === 'done') classes.push('is-done');
+        if (status === 'missed') classes.push('is-missed');
+        if (status === 'future') classes.push('is-future');
+        if (status === 'out') classes.push('is-out');
+        if (key === todayKey()) classes.push('is-today');
+
+        daysHtml +=
+          '<button class="' +
+          classes.join(' ') +
+          '" data-action="toggle-day" data-habit-id="' +
+          habit.id +
+          '" data-date="' +
+          key +
+          '" title="' +
+          day +
+          '">' +
+          day +
+          '</button>';
+      }
+
+      return (
+        '<div class="af-card af-habit">' +
+          '<div class="af-habit-top">' +
+            '<div>' +
+              '<div class="af-habit-name"><span>' + habit.emoji + '</span><span>' + escapeHtml(habit.name) + '</span></div>' +
+              '<div class="af-habit-meta">' +
+                '<span class="af-badge">' + habit.timesPerWeek + ' раз в неделю</span>' +
+                '<span class="af-badge">Старт ' + formatDate(habit.startDate) + '</span>' +
+                '<span class="af-badge">До ' + formatDate(endDate) + '</span>' +
+                '<span class="af-badge">Серия ' + streak + ' дн.</span>' +
+              '</div>' +
+            '</div>' +
+            '<button class="af-delete" data-action="delete-habit" data-habit-id="' + habit.id + '" title="Удалить">&times;</button>' +
+          '</div>' +
+          '<div class="af-progress"><span style="width:' + pct + '%"></span></div>' +
+          '<div class="af-progress-meta"><span>' + done + ' из ' + habit.targetDays + ' выполнено</span><strong>' + pct + '%</strong></div>' +
+          '<div class="af-days">' + daysHtml + '</div>' +
+        '</div>'
+      );
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function render() {
+      var summary = totals();
+
+      root.innerHTML =
+        '<div class="af-wrap">' +
+          '<div class="af-head">' +
+            '<div>' +
+              '<div class="af-title">Трекер привычек</div>' +
+              '<p class="af-subtitle">Простая версия на основе твоего трекера: добавляй привычки, отмечай дни, смотри прогресс и серию. Все данные сохраняются в браузере пользователя через localStorage.</p>' +
+              '<div class="af-monthbar">' +
+                '<button type="button" class="af-icon-btn" aria-label="Предыдущий месяц" data-action="prev-month">&lt;</button>' +
+                '<div class="af-month-title">' + monthTitle(view.year, view.month) + '</div>' +
+                '<button type="button" class="af-icon-btn" aria-label="Следующий месяц" data-action="next-month">&gt;</button>' +
+              '</div>' +
+            '</div>' +
+            '<button class="af-btn af-btn-secondary" data-action="reset-demo">Сбросить демо</button>' +
+          '</div>' +
+          '<div class="af-stats">' +
+            '<div class="af-card af-stat"><div class="af-label">Общий прогресс</div><div class="af-value">' + summary.pct + '<small>%</small></div></div>' +
+            '<div class="af-card af-stat"><div class="af-label">Выполнено</div><div class="af-value">' + summary.done + '<small> / ' + summary.target + '</small></div></div>' +
+            '<div class="af-card af-stat"><div class="af-label">Лучшая серия</div><div class="af-value">' + summary.streak + '<small> дн.</small></div></div>' +
+          '</div>' +
+          '<div class="af-grid">' +
+            '<div class="af-card af-panel">' +
+              '<h3 style="margin-bottom:14px;font-size:22px;font-weight:800;">Новая привычка</h3>' +
+              '<form class="af-form" id="af-habit-form">' +
+                '<div class="af-form-row">' +
+                  '<div><label>Эмодзи</label><input name="emoji" type="text" maxlength="2" value="✨"></div>' +
+                  '<div><label>Название</label><input name="name" type="text" placeholder="Например: читать 10 минут"></div>' +
+                '</div>' +
+                '<div><label>Дата старта</label><input name="startDate" type="date" value="' + todayKey() + '"></div>' +
+                '<div><label>Сколько раз в неделю</label><select name="timesPerWeek">' +
+                  '<option value="7">7 раз</option>' +
+                  '<option value="6">6 раз</option>' +
+                  '<option value="5" selected>5 раз</option>' +
+                  '<option value="4">4 раза</option>' +
+                  '<option value="3">3 раза</option>' +
+                  '<option value="2">2 раза</option>' +
+                  '<option value="1">1 раз</option>' +
+                '</select></div>' +
+                '<div><label>Сколько выполнений до закрепления</label><select name="targetDays">' +
+                  '<option value="21">21 день</option>' +
+                  '<option value="30" selected>30 дней</option>' +
+                  '<option value="45">45 дней</option>' +
+                  '<option value="66">66 дней</option>' +
+                  '<option value="90">90 дней</option>' +
+                '</select></div>' +
+                '<button class="af-btn af-btn-primary" type="submit">Добавить привычку</button>' +
+              '</form>' +
+            '</div>' +
+            '<div class="af-habits">' +
+              (state.habits.length
+                ? state.habits
+                    .map(function (h) { return renderHabit(h, view.year, view.month); })
+                    .join('')
+                : '<div class="af-card af-empty">Пока нет привычек. Добавь первую слева.</div>') +
+            '</div>' +
+          '</div>' +
+        '</div>';
+
+      var form = root.querySelector('#af-habit-form');
+      if (form) {
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          addHabit(form);
+        });
+      }
+
+      root.querySelectorAll('[data-action="toggle-day"]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          toggleHabitDay(button.getAttribute('data-habit-id'), button.getAttribute('data-date'));
+        });
+      });
+
+      root.querySelectorAll('[data-action="delete-habit"]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          if (confirm('Удалить привычку?')) {
+            deleteHabit(button.getAttribute('data-habit-id'));
+          }
+        });
+      });
+
+      var prevMonthBtn = root.querySelector('[data-action="prev-month"]');
+      if (prevMonthBtn) {
+        prevMonthBtn.addEventListener('click', function () {
+          view.month = view.month - 1;
+          if (view.month < 0) {
+            view.month = 11;
+            view.year = view.year - 1;
+          }
+          render();
+        });
+      }
+
+      var nextMonthBtn = root.querySelector('[data-action="next-month"]');
+      if (nextMonthBtn) {
+        nextMonthBtn.addEventListener('click', function () {
+          view.month = view.month + 1;
+          if (view.month > 11) {
+            view.month = 0;
+            view.year = view.year + 1;
+          }
+          render();
+        });
+      }
+
+      var resetButton = root.querySelector('[data-action="reset-demo"]');
+      if (resetButton) {
+        resetButton.addEventListener('click', function () {
+          localStorage.removeItem(STORAGE_KEY);
+          state = { habits: sampleHabits() };
+          saveState();
+          render();
+        });
+      }
+    }
+
+    render();
+  })();
+</script>
