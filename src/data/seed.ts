@@ -10,6 +10,7 @@ export type PageId =
   | 'quests'
   | 'life-map'
   | 'progress'
+  | 'achievements'
 
 export type HabitPriority = 'important' | 'urgent' | 'low'
 

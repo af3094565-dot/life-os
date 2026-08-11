@@ -137,10 +137,10 @@ export function StepWizard({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-muted hover:bg-canvas hover:text-ink"
+            className="touch-target rounded-xl p-2.5 text-muted hover:bg-canvas hover:text-ink"
             aria-label="Закрыть"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
 
@@ -184,25 +184,25 @@ export function StepWizard({
             lastFooter
           ) : (
             <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => goTo(step - 1)}
-                disabled={isFirst}
-                className="inline-flex items-center gap-1 rounded-xl px-3 py-2.5 text-sm font-bold text-muted hover:bg-canvas disabled:opacity-30"
-              >
-                <ChevronLeft size={16} /> Назад
-              </button>
-              <p className="truncate text-center text-xs font-semibold text-muted">
-                {current?.title}
-              </p>
-              <button
-                type="button"
-                onClick={() => goTo(step + 1)}
-                disabled={isLast}
-                className="inline-flex items-center gap-1 rounded-xl bg-brand px-3 py-2.5 text-sm font-bold text-white hover:bg-brand-deep disabled:opacity-30"
-              >
-                Далее <ChevronRight size={16} />
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => goTo(step - 1)}
+                    disabled={isFirst}
+                    className="inline-flex min-h-[48px] items-center gap-1 rounded-xl px-3 py-2.5 text-base font-bold text-muted hover:bg-canvas disabled:opacity-30"
+                  >
+                    <ChevronLeft size={16} /> Назад
+                  </button>
+                  <p className="truncate text-center text-xs font-semibold text-muted">
+                    {current?.title}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => goTo(step + 1)}
+                    disabled={isLast}
+                    className="inline-flex min-h-[48px] items-center gap-1 rounded-xl bg-brand px-4 py-2.5 text-base font-bold text-white hover:bg-brand-deep disabled:opacity-30"
+                  >
+                    Далее <ChevronRight size={16} />
+                  </button>
             </div>
           )}
           {isLast && lastFooter && (

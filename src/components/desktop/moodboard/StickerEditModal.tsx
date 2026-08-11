@@ -164,6 +164,42 @@ export function StickerEditModal({
         </div>
 
         <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted">
+          Что это?
+        </label>
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          {(
+            [
+              { id: 'note', label: 'Идея / заметка', emoji: '📝' },
+              { id: 'goal', label: 'Цель', emoji: '🎯' },
+              { id: 'habit', label: 'Привычка', emoji: '🔁' },
+            ] as const
+          ).map((opt) => {
+            const active =
+              opt.id === 'note'
+                ? sticker.kind !== 'goal' && sticker.kind !== 'habit'
+                : sticker.kind === opt.id
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => {
+                  if (opt.id === 'goal' && sticker.kind !== 'goal') handleConvertGoal()
+                  if (opt.id === 'habit' && sticker.kind !== 'habit') handleConvertHabit()
+                }}
+                className={`rounded-xl px-3 py-2.5 text-left text-xs font-bold ring-1 transition ${
+                  active
+                    ? 'bg-brand-soft text-brand ring-brand/30'
+                    : 'bg-canvas text-ink ring-line'
+                }`}
+              >
+                <span className="mr-1">{opt.emoji}</span>
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+
+        <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted">
           Название
         </label>
         <input

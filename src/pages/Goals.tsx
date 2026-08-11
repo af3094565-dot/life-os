@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   CheckCircle2,
   ClipboardCheck,
@@ -10,19 +10,22 @@ import {
   X,
 } from 'lucide-react'
 import { AttachHabitModal } from '../components/AttachHabitModal'
+import { BackBar } from '../components/BackBar'
+import { EmptyState } from '../components/EmptyState'
 import { GoalCheckInModal } from '../components/GoalCheckInModal'
 import { GoalFormModal } from '../components/GoalFormModal'
 import { HabitFormModal } from '../components/HabitFormModal'
 import { LifeGoalsMap } from '../components/LifeGoalsMap'
 import { MandalaMatrixModal } from '../components/MandalaMatrixModal'
 import { Header } from '../components/Header'
+import { NextActionCard } from '../components/NextActionCard'
 import { SubscriptionPaywall } from '../components/SubscriptionPaywall'
 import { Card, ProgressBar } from '../components/ui'
 import { LIFE_GOALS_MAP_ID } from '../data/lifeMap'
 import type { GoalStat, LifeOSState } from '../hooks/useLifeOS'
 import { ECONOMY } from '../lib/economy'
 import { cadenceLabel } from '../lib/goalLogic'
-import { completedCount } from '../lib/habitLogic'
+import { completedCount, todayKey } from '../lib/habitLogic'
 import { filledHabitTitles } from '../lib/mandala'
 import {
   submitGoalWithMoodboardOption,
@@ -36,6 +39,11 @@ type Props = {
   userName: string
   hasSubscription: boolean
   onBuySubscription: () => void
+  focusGoalId?: string
+  returnLabel?: string | null
+  onBack?: () => void
+  onOpenHabit?: (habitId: string) => void
+  onClearFocus?: () => void
 }
 
 const STATUS_LABEL: Record<GoalStat['status'], string> = {
@@ -49,6 +57,10 @@ export function GoalsPage({
   userName,
   hasSubscription,
   onBuySubscription,
+  focusGoalId,
+  returnLabel,
+  onBack,
+  onOpenHabit,
 }: Props) {
   const [goalFormOpen, setGoalFormOpen] = useState(false)
   const [matrixOpen, setMatrixOpen] = useState(false)
@@ -57,6 +69,7 @@ export function GoalsPage({
   const [habitFormGoalId, setHabitFormGoalId] = useState<string | null>(null)
   const [attachGoalId, setAttachGoalId] = useState<string | null>(null)
   const [checkInGoalId, setCheckInGoalId] = useState<string | null>(null)
+  const focusRef = useRef<HTMLDivElement | null>(null)
 
   const attachable = state.habitsAll.filter(
     (h) => !h.goalId || (attachGoalId && h.goalId !== attachGoalId),
@@ -73,12 +86,21 @@ export function GoalsPage({
     ...customGoals,
   ]
 
+  const focusGoal =
+    listGoals.find((g) => g.id === focusGoalId) ??
+    listGoals.find((g) => g.status === 'active')
+
+  useEffect(() => {
+    if (!focusGoalId || !focusRef.current) return
+    focusRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [focusGoalId])
+
   if (!hasSubscription) {
     return (
       <div>
         <Header
-          greeting="Мои цели"
-          subtitle="Доступно по подписке"
+          greeting="Цели"
+          subtitle="Куда я хочу прийти?"
           streak={state.streak}
           diamonds={state.diamonds}
           visitStreak={state.visitStreak}
@@ -90,17 +112,56 @@ export function GoalsPage({
     )
   }
 
+  const nextHabit = focusGoal?.habits.find((h) => {
+    const key = todayKey()
+    return !h.completions[key]
+  })
+
   return (
-    <div>
+    <div className="pb-24 md:pb-0">
+      {onBack && returnLabel && <BackBar label={`← ${returnLabel}`} onBack={onBack} />}
       <Header
-        greeting="Мои цели"
-        subtitle="Колесо баланса и свои цели · привычки — ежедневный путь"
+        greeting="Цели"
+        subtitle="Куда я хочу прийти? · цель → привычки → сегодня"
         streak={state.streak}
         diamonds={state.diamonds}
         visitStreak={state.visitStreak}
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}
       />
+
+      {focusGoal && focusGoal.status === 'active' && (
+        <NextActionCard
+          className="mb-5"
+          title="Продолжить цель"
+          action={
+            nextHabit
+              ? `${nextHabit.emoji} ${nextHabit.name}`
+              : focusGoal.habitCount === 0
+                ? 'Добавь первую привычку к цели'
+                : focusGoal.needsCheckIn
+                  ? 'Обнови результат цели'
+                  : `🎯 ${focusGoal.title} · ${focusGoal.progress}%`
+          }
+          related={`🎯 ${focusGoal.title}`}
+          relatedHint="Цель:"
+          cta={
+            nextHabit
+              ? 'Сделать сейчас'
+              : focusGoal.habitCount === 0
+                ? 'Добавить привычку'
+                : focusGoal.needsCheckIn
+                  ? 'Обновить'
+                  : 'Открыть'
+          }
+          onAction={() => {
+            if (nextHabit && onOpenHabit) onOpenHabit(nextHabit.id)
+            else if (focusGoal.habitCount === 0) setHabitFormGoalId(focusGoal.id)
+            else if (focusGoal.needsCheckIn) setCheckInGoalId(focusGoal.id)
+          }}
+          icon="🎯"
+        />
+      )}
 
       <div className="mb-4 flex flex-wrap justify-end gap-2">
         <button
@@ -124,82 +185,69 @@ export function GoalsPage({
         </button>
       </div>
 
-      <Card className="mb-4 !py-3 animate-fade-up" data-tour="goals-life-map">
-        <p className="text-sm font-medium leading-relaxed text-muted">
-          <span className="font-extrabold text-ink">Цели</span> — «Колесо баланса» уже в
-          списке: открой карту и заполни привычки. Ниже — свои цели.
-        </p>
-      </Card>
-
       {listGoals.length === 0 ? (
-        <Card className="animate-fade-up py-12 text-center">
-          <p className="text-base font-extrabold text-ink">Своих целей пока нет</p>
-          <p className="mt-1 text-sm text-muted">
-            Таблица карты жизни уже есть на странице «Карта жизни». Здесь — цели и карта 9×9.
-          </p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setMatrixEditId(null)
-                setMatrixOpen(true)
-              }}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-white"
-            >
-              <Grid3x3 size={16} /> Карта цели · −{ECONOMY.MATRIX_COST}
-            </button>
-            <button
-              type="button"
-              onClick={() => setGoalFormOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white"
-            >
-              <Plus size={16} /> Создать цель
-            </button>
-          </div>
-        </Card>
+        <EmptyState
+          emoji="🎯"
+          title="Здесь будут твои цели"
+          description="Цель помогает понять, ради чего ты выполняешь привычки. Создай первую цель за 30 секунд."
+          cta="Создать цель"
+          onCta={() => setGoalFormOpen(true)}
+          secondary="Карта цели 9×9"
+          onSecondary={() => {
+            setMatrixEditId(null)
+            setMatrixOpen(true)
+          }}
+        />
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {listGoals.map((g, i) => {
             const isLifeWheel = g.id === LIFE_GOALS_MAP_ID
+            const focused = focusGoalId === g.id
             return (
-              <GoalCard
+              <div
                 key={g.id}
-                goal={g}
-                delay={i * 60}
-                systemLocked={isLifeWheel}
-                onCheckIn={() => setCheckInGoalId(g.id)}
-                onToggleStage={(stageId) => state.toggleGoalStage(g.id, stageId)}
-                onAddHabit={() => setHabitFormGoalId(g.id)}
-                onAttach={() => setAttachGoalId(g.id)}
-                onUnlink={(habitId) => state.linkHabitToGoal(habitId, null)}
-                onPause={() =>
-                  state.setGoalStatus(g.id, g.status === 'paused' ? 'active' : 'paused')
-                }
-                onDone={() =>
-                  state.setGoalStatus(g.id, g.status === 'done' ? 'active' : 'done')
-                }
-                onDelete={() => {
-                  if (
-                    confirm(
-                      `Удалить цель «${g.title}»? Связанные привычки тоже удалятся.`,
-                    )
-                  ) {
-                    state.deleteGoal(g.id)
+                ref={focused ? focusRef : undefined}
+                className={focused ? 'rounded-2xl ring-2 ring-brand/40' : undefined}
+              >
+                <GoalCard
+                  goal={g}
+                  delay={i * 60}
+                  systemLocked={isLifeWheel}
+                  onCheckIn={() => setCheckInGoalId(g.id)}
+                  onToggleStage={(stageId) => state.toggleGoalStage(g.id, stageId)}
+                  onAddHabit={() => setHabitFormGoalId(g.id)}
+                  onAttach={() => setAttachGoalId(g.id)}
+                  onUnlink={(habitId) => state.linkHabitToGoal(habitId, null)}
+                  onOpenHabit={onOpenHabit}
+                  onPause={() =>
+                    state.setGoalStatus(g.id, g.status === 'paused' ? 'active' : 'paused')
                   }
-                }}
-                onEditMatrix={
-                  g.measureKind === 'matrix'
-                    ? () => {
-                        if (isLifeWheel) {
-                          setLifeGoalsMapOpen(true)
-                          return
+                  onDone={() =>
+                    state.setGoalStatus(g.id, g.status === 'done' ? 'active' : 'done')
+                  }
+                  onDelete={() => {
+                    if (
+                      confirm(
+                        `Удалить цель «${g.title}»? Связанные привычки тоже удалятся.`,
+                      )
+                    ) {
+                      state.deleteGoal(g.id)
+                    }
+                  }}
+                  onEditMatrix={
+                    g.measureKind === 'matrix'
+                      ? () => {
+                          if (isLifeWheel) {
+                            setLifeGoalsMapOpen(true)
+                            return
+                          }
+                          setMatrixEditId(g.id)
+                          setMatrixOpen(true)
                         }
-                        setMatrixEditId(g.id)
-                        setMatrixOpen(true)
-                      }
-                    : undefined
-                }
-              />
+                      : undefined
+                  }
+                />
+              </div>
             )
           })}
         </div>
@@ -320,6 +368,7 @@ function GoalCard({
   onAddHabit,
   onAttach,
   onUnlink,
+  onOpenHabit,
   onPause,
   onDone,
   onDelete,
@@ -333,6 +382,7 @@ function GoalCard({
   onAddHabit: () => void
   onAttach: () => void
   onUnlink: (habitId: string) => void
+  onOpenHabit?: (habitId: string) => void
   onPause: () => void
   onDone: () => void
   onDelete: () => void
@@ -512,7 +562,7 @@ function GoalCard({
       <div className="mb-3 border-t border-line pt-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h4 className="text-xs font-bold uppercase tracking-wide text-muted">
-            План привычек · {g.habitCount}
+            Связанные привычки · {g.habitCount}
             {isMatrix && !isLifeWheel ? ' · бесплатно' : ''}
           </h4>
         </div>
@@ -537,23 +587,29 @@ function GoalCard({
                   key={h.id}
                   className="flex items-center gap-2 rounded-xl bg-canvas px-3 py-2"
                 >
-                  <span>{h.emoji}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-ink">
-                      {h.name}
-                      {h.fromMatrix && (
-                        <span className="ml-1 text-[10px] font-bold text-emerald-700">
-                          free
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    onClick={() => onOpenHabit?.(h.id)}
+                  >
+                    <span>{h.emoji}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink">
+                        {h.name}
+                        {h.fromMatrix && (
+                          <span className="ml-1 text-[10px] font-bold text-emerald-700">
+                            free
+                          </span>
+                        )}
+                      </p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <ProgressBar value={formPct} className="!h-1 flex-1" />
+                        <span className="shrink-0 text-[10px] font-bold text-muted">
+                          {h.timesPerWeek}×/нед
                         </span>
-                      )}
-                    </p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <ProgressBar value={formPct} className="!h-1 flex-1" />
-                      <span className="shrink-0 text-[10px] font-bold text-muted">
-                        {h.timesPerWeek}×/нед
-                      </span>
+                      </div>
                     </div>
-                  </div>
+                  </button>
                   {!systemLocked && (
                     <button
                       type="button"

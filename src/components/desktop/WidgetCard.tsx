@@ -24,8 +24,10 @@ function widgetTitle(type: DesktopWidgetType) {
       return 'Квесты'
     case 'life-map':
       return 'Карта жизни'
-    case 'progress':
+      case 'progress':
       return 'Прогресс'
+    case 'achievements':
+      return 'Достижения'
   }
 }
 
@@ -114,6 +116,8 @@ export function WidgetCard({
           <HabitsWidgetPreview widgetSize={widget.size} state={state} />
         ) : widget.type === 'goals' ? (
           <GoalsWidgetPreview widgetSize={widget.size} state={state} />
+        ) : widget.type === 'achievements' ? (
+          <AchievementsWidgetPreview widgetSize={widget.size} state={state} onOpen={onOpen} />
         ) : (
           <WidgetPreview type={widget.type} size={widget.size} />
         )}
@@ -154,6 +158,44 @@ function WidgetPreview({ type, size }: { type: DesktopWidgetType; size: DesktopW
           В этом размере позже появится расширенный функционал. Сейчас — базовая интеграция.
         </div>
       </div>
+    </div>
+  )
+}
+
+function AchievementsWidgetPreview({
+  widgetSize,
+  state,
+  onOpen,
+}: {
+  widgetSize: DesktopWidgetSize
+  state: LifeOSState
+  onOpen: () => void
+}) {
+  const unlocked = state.unlockedAchievementCount
+  const total = state.totalAchievements
+  const pct = total ? Math.round((unlocked / total) * 100) : 0
+  const nearest = state.nearestAchievements[0]
+  return (
+    <div className="rounded-xl bg-canvas/50 px-3 py-3 ring-1 ring-line">
+      <div className="text-[11px] font-bold uppercase tracking-wide text-muted">
+        🏆 Achievements
+      </div>
+      <div className="mt-1 text-lg font-extrabold text-ink">
+        {unlocked} / {total}
+      </div>
+      <ProgressBar value={pct} className="mt-2" />
+      {widgetSize !== 'minimal' && nearest?.progress && (
+        <p className="mt-2 text-xs font-semibold text-muted">
+          Ближайшее: {nearest.icon} {nearest.progress.current} / {nearest.progress.target}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={onOpen}
+        className="mt-3 rounded-lg bg-brand-soft px-2.5 py-1.5 text-xs font-extrabold text-brand"
+      >
+        Открыть
+      </button>
     </div>
   )
 }

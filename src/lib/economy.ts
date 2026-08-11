@@ -107,6 +107,7 @@ export type DiamondTxReason =
   | 'visit_streak'
   | 'friend_grant'
   | 'tester_grant'
+  | 'achievement'
 
 export type DiamondTx = {
   id: string

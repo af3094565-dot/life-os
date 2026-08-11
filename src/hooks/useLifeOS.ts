@@ -82,6 +82,23 @@ import {
   userListingHabitCopy,
 } from '../lib/questLogic'
 import { filledHabitTitles, habitSlotKey, MATRIX_EMOJIS, normalizeMatrix } from '../lib/mandala'
+import type { AchievementEvent, AchievementState } from '../data/achievements/types'
+import {
+  acknowledgeUnlocks,
+  buildAchievementViews,
+  getNearestAchievements,
+  markNotificationsRead,
+  pinAchievement,
+  setAchievementSound,
+  setActiveTitle,
+  TOTAL_ACHIEVEMENTS,
+} from '../lib/achievements'
+import {
+  applyAchievementEventsToStore,
+  emptyAchievements,
+  ensureAchievementsBackfilled,
+} from '../lib/achievements/storeBridge'
+import { normalizeAchievementState } from '../lib/achievements'
 
 const STORAGE_BASE = 'life-os-habits-v12'
 const LEGACY_STORAGE_KEY = 'life-os-habits-v12'
@@ -225,6 +242,7 @@ export type DesktopWidgetType =
   | 'quests'
   | 'life-map'
   | 'progress'
+  | 'achievements'
 
 export type DesktopWidgetInstance = {
   id: string
@@ -331,6 +349,8 @@ type Store = {
   plannerSections?: PlannerSection[]
   plannerTasks?: PlannerTask[]
   desktop?: DesktopState
+  /** Steam-style достижения */
+  achievements?: AchievementState
 }
 
 const FOCUS_PRESETS: Record<FocusProfileId, Omit<FocusSettings, 'profile'>> = {
@@ -500,7 +520,7 @@ function isLegacyNormalizedSticker(s: Partial<DesktopMoodboardSticker>) {
 function normalizeDesktopWidgetInstance(input: DesktopWidgetInstance): DesktopWidgetInstance {
   const type = input?.type
   const size = input?.size
-  const allowedTypes: DesktopWidgetType[] = ['habits', 'goals', 'planner', 'moodboard', 'dashboard', 'quests', 'life-map', 'progress']
+  const allowedTypes: DesktopWidgetType[] = ['habits', 'goals', 'planner', 'moodboard', 'dashboard', 'quests', 'life-map', 'progress', 'achievements']
   const allowedSizes: DesktopWidgetSize[] = ['minimal', 'medium', 'large']
   return {
     id: String(input?.id ?? desktopId('w')),
@@ -913,6 +933,7 @@ function freshStore(): Store {
     plannerSections: defaultPlannerSections(),
     plannerTasks: [],
     desktop: defaultDesktopState(),
+    achievements: emptyAchievements(),
   }
 }
 
@@ -969,6 +990,7 @@ function parseStore(raw: string): Store | null {
         ? parsed.plannerTasks.map(normalizePlannerTask)
         : [],
       desktop: normalizeDesktopState(parsed.desktop),
+      achievements: normalizeAchievementState(parsed.achievements),
     }
   } catch {
     return null
@@ -1034,13 +1056,36 @@ function applyVisitReward(store: Store): Store {
     )
   }
 
-  return {
+  const prevVisit = store.lastVisitDate
+  let daysAway = 0
+  if (prevVisit) {
+    const a = new Date(prevVisit + 'T12:00:00')
+    const b = new Date(today + 'T12:00:00')
+    daysAway = Math.max(0, Math.round((b.getTime() - a.getTime()) / 86_400_000))
+  }
+
+  const withVisit = {
     ...store,
     diamonds,
     diamondHistory,
     visitStreak,
     lastVisitDate: today,
   }
+
+  return applyAchievementEventsToStore(withVisit, [
+    {
+      type: 'app_visit',
+      payload: { daysAway, previousVisitDate: prevVisit },
+    },
+    ...(visitStreak > 0 && visitStreak % ECONOMY.VISIT_STREAK_DAYS === 0
+      ? [
+          {
+            type: 'diamonds_earned' as const,
+            payload: { amount: ECONOMY.VISIT_STREAK_BONUS },
+          },
+        ]
+      : []),
+  ])
 }
 
 function loadStore(userId: string): Store {
@@ -1338,7 +1383,32 @@ export function useLifeOS(userId: string | null) {
         diamonds,
         diamondHistory,
       )
-      return {
+      const prevWon = (s.contracts ?? []).filter((c) => c.status === 'won').length
+      const nextWon = settled.contracts.filter((c) => c.status === 'won').length
+      const events: AchievementEvent[] = []
+      if (marked && !was) {
+        events.push({ type: 'habit_completed', payload: { habitId } })
+        events.push({
+          type: 'diamonds_earned',
+          payload: { amount: ECONOMY.DAY_REWARD },
+        })
+      }
+      if (!marked && was) {
+        events.push({
+          type: 'habit_uncompleted',
+          payload: { habitId, previousStreak: s.streak },
+        })
+      }
+      if (nextWon > prevWon) {
+        for (let i = 0; i < nextWon - prevWon; i++) {
+          events.push({ type: 'quest_won' })
+        }
+        const gained = settled.diamonds - diamonds
+        if (gained > 0) {
+          events.push({ type: 'diamonds_earned', payload: { amount: gained } })
+        }
+      }
+      const base = {
         ...s,
         habits,
         quests,
@@ -1348,6 +1418,7 @@ export function useLifeOS(userId: string | null) {
         diamondHistory: settled.diamondHistory,
         retroMarks,
       }
+      return applyAchievementEventsToStore(base, events)
     })
     return { ok: true }
   }
@@ -1529,28 +1600,40 @@ export function useLifeOS(userId: string | null) {
 
       const diamonds = s.diamonds - cost
       const area = findLifeArea(areaId)
-      return {
-        ...s,
-        habits,
-        goals,
-        quests: syncQuests(habits, s.quests),
-        diamonds,
-        diamondHistory:
-          cost > 0
-            ? pushDiamondTx(
-                s.diamondHistory,
-                makeDiamondTx({
-                  amount: -cost,
-                  reason: input.fromLifeMap || areaId ? 'life_map_habit' : 'habit_create',
-                  label:
-                    input.fromLifeMap || areaId
-                      ? `Карта жизни · ${area?.short ?? 'аспект'} · ${habit.name}`
-                      : `Новая привычка · ${habit.name}`,
-                  balanceAfter: diamonds,
-                }),
-              )
-            : s.diamondHistory,
+      const events: AchievementEvent[] = [
+        {
+          type: 'habit_created',
+          payload: { habitId: id, goalId: habit.goalId },
+        },
+      ]
+      if (cost > 0) {
+        events.push({ type: 'diamonds_spent', payload: { amount: cost } })
       }
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          habits,
+          goals,
+          quests: syncQuests(habits, s.quests),
+          diamonds,
+          diamondHistory:
+            cost > 0
+              ? pushDiamondTx(
+                  s.diamondHistory,
+                  makeDiamondTx({
+                    amount: -cost,
+                    reason: input.fromLifeMap || areaId ? 'life_map_habit' : 'habit_create',
+                    label:
+                      input.fromLifeMap || areaId
+                        ? `Карта жизни · ${area?.short ?? 'аспект'} · ${habit.name}`
+                        : `Новая привычка · ${habit.name}`,
+                    balanceAfter: diamonds,
+                  }),
+                )
+              : s.diamondHistory,
+        },
+        events,
+      )
     })
     return { ok: true, habitId: id }
   }
@@ -1563,20 +1646,25 @@ export function useLifeOS(userId: string | null) {
     if (!exists) return { ok: false, reason: 'Привычка не найдена' }
     if (!input.name.trim()) return { ok: false, reason: 'Укажи название привычки' }
     setStore((s) => ({
-      ...s,
-      habits: s.habits.map(normalizeHabit).map((h) =>
-        h.id === habitId
-          ? {
-              ...h,
-              name: input.name.trim(),
-              emoji: input.emoji || h.emoji,
-              priority: input.priority,
-              targetDays: input.targetDays,
-              startDate: input.startDate,
-              timesPerWeek: input.timesPerWeek,
-              reminderTime: input.reminderTime || undefined,
-            }
-          : h,
+      ...applyAchievementEventsToStore(
+        {
+          ...s,
+          habits: s.habits.map(normalizeHabit).map((h) =>
+            h.id === habitId
+              ? {
+                  ...h,
+                  name: input.name.trim(),
+                  emoji: input.emoji || h.emoji,
+                  priority: input.priority,
+                  targetDays: input.targetDays,
+                  startDate: input.startDate,
+                  timesPerWeek: input.timesPerWeek,
+                  reminderTime: input.reminderTime || undefined,
+                }
+              : h,
+          ),
+        },
+        [{ type: 'habit_updated', payload: { habitId } }],
       ),
     }))
     return { ok: true }
@@ -1596,14 +1684,17 @@ export function useLifeOS(userId: string | null) {
         syncLifeMapGoalsIfPresent(s.goals.map(normalizeGoal)),
         habits,
       )
-      return {
-        ...s,
-        habits,
-        goals,
-        contracts,
-        quests: syncQuests(habits, s.quests),
-        streak: globalStreak(habits),
-      }
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          habits,
+          goals,
+          contracts,
+          quests: syncQuests(habits, s.quests),
+          streak: globalStreak(habits),
+        },
+        [{ type: 'habit_deleted', payload: { habitId } }],
+      )
     })
   }
 
@@ -1657,22 +1748,29 @@ export function useLifeOS(userId: string | null) {
       }
       const habits = [...s.habits.map(normalizeHabit), habit]
       const diamonds = s.diamonds - template.cost
-      return {
-        ...s,
-        habits,
-        quests: syncQuests(habits, s.quests),
-        contracts: [...(s.contracts ?? []).map(normalizeContract), contract],
-        diamonds,
-        diamondHistory: pushDiamondTx(
-          s.diamondHistory,
-          makeDiamondTx({
-            amount: -template.cost,
-            reason: 'quest_accept',
-            label: `Квест · ${template.title}`,
-            balanceAfter: diamonds,
-          }),
-        ),
-      }
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          habits,
+          quests: syncQuests(habits, s.quests),
+          contracts: [...(s.contracts ?? []).map(normalizeContract), contract],
+          diamonds,
+          diamondHistory: pushDiamondTx(
+            s.diamondHistory,
+            makeDiamondTx({
+              amount: -template.cost,
+              reason: 'quest_accept',
+              label: `Квест · ${template.title}`,
+              balanceAfter: diamonds,
+            }),
+          ),
+        },
+        [
+          { type: 'quest_accepted', payload: { cost: template.cost } },
+          { type: 'diamonds_spent', payload: { amount: template.cost } },
+          { type: 'habit_created', payload: { habitId } },
+        ],
+      )
     })
     return { ok: true }
   }
@@ -1964,14 +2062,21 @@ export function useLifeOS(userId: string | null) {
         }),
       )
 
-      return {
-        ...s,
-        habits,
-        quests: syncQuests(habits, s.quests),
-        contracts: [...(s.contracts ?? []).map(normalizeContract), contract],
-        diamonds,
-        diamondHistory,
-      }
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          habits,
+          quests: syncQuests(habits, s.quests),
+          contracts: [...(s.contracts ?? []).map(normalizeContract), contract],
+          diamonds,
+          diamondHistory,
+        },
+        [
+          { type: 'quest_accepted', payload: { cost: listing.price } },
+          { type: 'diamonds_spent', payload: { amount: listing.price } },
+          { type: 'habit_created' },
+        ],
+      )
     })
 
     return { ok: true, saleClaim }
@@ -2123,20 +2228,26 @@ export function useLifeOS(userId: string | null) {
         checkIns: [],
       }
       const diamonds = s.diamonds - ECONOMY.GOAL_COST
-      return {
-        ...s,
-        goals: [...s.goals.map(normalizeGoal), goal],
-        diamonds,
-        diamondHistory: pushDiamondTx(
-          s.diamondHistory,
-          makeDiamondTx({
-            amount: -ECONOMY.GOAL_COST,
-            reason: 'goal_create',
-            label: `Новая цель · ${goal.title}`,
-            balanceAfter: diamonds,
-          }),
-        ),
-      }
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          goals: [...s.goals.map(normalizeGoal), goal],
+          diamonds,
+          diamondHistory: pushDiamondTx(
+            s.diamondHistory,
+            makeDiamondTx({
+              amount: -ECONOMY.GOAL_COST,
+              reason: 'goal_create',
+              label: `Новая цель · ${goal.title}`,
+              balanceAfter: diamonds,
+            }),
+          ),
+        },
+        [
+          { type: 'goal_created', payload: { goalId } },
+          { type: 'diamonds_spent', payload: { amount: ECONOMY.GOAL_COST } },
+        ],
+      )
     })
     return { ok: true, goalId }
   }
@@ -2363,12 +2474,15 @@ export function useLifeOS(userId: string | null) {
       const habits = s.habits.map(normalizeHabit).map((habit) =>
         habit.id === task.habitId ? { ...habit, startDate: scheduledFor } : habit,
       )
-      return {
-        ...s,
-        habits,
-        quests: syncQuests(habits, s.quests),
-        plannerTasks: tasks,
-      }
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          habits,
+          quests: syncQuests(habits, s.quests),
+          plannerTasks: tasks,
+        },
+        [{ type: 'task_rescheduled', payload: { taskId } }],
+      )
     })
   }
 
@@ -2416,9 +2530,9 @@ export function useLifeOS(userId: string | null) {
 
   /** Отметить этап выполненным */
   const completeGoalStage = (goalId: string, stageId: string, note?: string) => {
-    setStore((s) => ({
-      ...s,
-      goals: s.goals.map(normalizeGoal).map((g) => {
+    setStore((s) => {
+      let completedGoal = false
+      const goals = s.goals.map(normalizeGoal).map((g) => {
         if (g.id !== goalId || g.measureKind !== 'stages') return g
         const stages = (g.stages ?? []).map((st) =>
           st.id === stageId ? { ...st, done: true } : st,
@@ -2428,15 +2542,33 @@ export function useLifeOS(userId: string | null) {
           note: note?.trim() || undefined,
         })
         const progress = goalResultProgress({ ...g, stages })
+        const status = progress === 100 ? 'done' : g.status
+        if (status === 'done' && g.status !== 'done') completedGoal = true
         return {
           ...g,
           stages,
           lastCheckInAt: checkIn.at,
           checkIns: [...(g.checkIns ?? []), checkIn].slice(-50),
-          status: progress === 100 ? 'done' : g.status,
+          status,
         }
-      }),
-    }))
+      })
+      const events: AchievementEvent[] = [
+        { type: 'goal_stage_completed', payload: { goalId, stageId } },
+      ]
+      if (completedGoal) {
+        const g = s.goals.map(normalizeGoal).find((x) => x.id === goalId)
+        const ageDays = g
+          ? Math.floor(
+              (Date.now() - new Date(g.createdAt).getTime()) / 86_400_000,
+            )
+          : 0
+        events.push({
+          type: 'goal_completed',
+          payload: { goalId, ageDays, sameDay: ageDays === 0 },
+        })
+      }
+      return applyAchievementEventsToStore({ ...s, goals }, events)
+    })
   }
 
   const toggleGoalStage = (goalId: string, stageId: string) => {
@@ -2461,12 +2593,28 @@ export function useLifeOS(userId: string | null) {
   }
 
   const setGoalStatus = (id: string, status: GoalStatus) => {
-    setStore((s) => ({
-      ...s,
-      goals: s.goals.map(normalizeGoal).map((g) =>
+    setStore((s) => {
+      const prev = s.goals.map(normalizeGoal).find((g) => g.id === id)
+      const goals = s.goals.map(normalizeGoal).map((g) =>
         g.id === id ? { ...g, status } : g,
-      ),
-    }))
+      )
+      const events: AchievementEvent[] = []
+      if (status === 'done' && prev?.status !== 'done') {
+        const ageDays = prev
+          ? Math.floor(
+              (Date.now() - new Date(prev.createdAt).getTime()) / 86_400_000,
+            )
+          : 0
+        events.push({
+          type: 'goal_completed',
+          payload: { goalId: id, ageDays, sameDay: ageDays === 0 },
+        })
+      }
+      if (status !== prev?.status) {
+        events.push({ type: 'goal_updated', payload: { goalId: id } })
+      }
+      return applyAchievementEventsToStore({ ...s, goals }, events)
+    })
   }
 
   const deleteGoal = (id: string) => {
@@ -2486,14 +2634,17 @@ export function useLifeOS(userId: string | null) {
           ? { ...c, status: 'abandoned' as const, completedAt: todayKey() }
           : c,
       )
-      return {
-        ...s,
-        goals: s.goals.map(normalizeGoal).filter((g) => g.id !== id),
-        habits,
-        contracts,
-        quests: syncQuests(habits, s.quests),
-        streak: globalStreak(habits),
-      }
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          goals: s.goals.map(normalizeGoal).filter((g) => g.id !== id),
+          habits,
+          contracts,
+          quests: syncQuests(habits, s.quests),
+          streak: globalStreak(habits),
+        },
+        [{ type: 'goal_deleted', payload: { goalId: id } }],
+      )
     })
   }
 
@@ -2510,20 +2661,26 @@ export function useLifeOS(userId: string | null) {
   const linkHabitToGoal = (habitId: string, goalId: string | null) => {
     setStore((s) => {
       const areaFromGoal = goalId ? parseLifeMapGoalArea(goalId) : undefined
-      return {
+      const habits = s.habits.map(normalizeHabit).map((h) => {
+        if (h.id !== habitId) return h
+        if (!goalId) {
+          return { ...h, goalId: undefined }
+        }
+        if (areaFromGoal) {
+          return { ...h, goalId, lifeArea: areaFromGoal }
+        }
+        return { ...h, goalId }
+      })
+      const base = {
         ...s,
         goals: syncLifeMapGoalsIfPresent(s.goals.map(normalizeGoal)),
-        habits: s.habits.map(normalizeHabit).map((h) => {
-          if (h.id !== habitId) return h
-          if (!goalId) {
-            return { ...h, goalId: undefined }
-          }
-          if (areaFromGoal) {
-            return { ...h, goalId, lifeArea: areaFromGoal }
-          }
-          return { ...h, goalId }
-        }),
+        habits,
       }
+      return goalId
+        ? applyAchievementEventsToStore(base, [
+            { type: 'habit_created', payload: { habitId, goalId } },
+          ])
+        : base
     })
   }
 
@@ -2535,7 +2692,10 @@ export function useLifeOS(userId: string | null) {
         ensureLifeMapGoals(s.goals.map(normalizeGoal)),
         habits,
       )
-      return { ...s, goals, habits }
+      return applyAchievementEventsToStore(
+        { ...s, goals, habits },
+        [{ type: 'life_map_created' }],
+      )
     })
     return { ok: true }
   }
@@ -2871,12 +3031,15 @@ export function useLifeOS(userId: string | null) {
         createdAt: new Date().toISOString(),
       }
       const habits = [...s.habits.map(normalizeHabit), habit]
-      return {
-        ...s,
-        habits,
-        quests: syncQuests(habits, s.quests),
-        plannerTasks: [...((s.plannerTasks ?? []).map(normalizePlannerTask)), task],
-      }
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          habits,
+          quests: syncQuests(habits, s.quests),
+          plannerTasks: [...((s.plannerTasks ?? []).map(normalizePlannerTask)), task],
+        },
+        [{ type: 'task_created', payload: { taskId } }],
+      )
     })
     return { ok: true }
   }
@@ -2924,13 +3087,19 @@ export function useLifeOS(userId: string | null) {
         })
       }
       const quests = syncQuests(habits, s.quests)
-      return {
-        ...s,
-        habits,
-        quests,
-        plannerTasks: tasks,
-        streak: globalStreak(habits),
-      }
+      const events: AchievementEvent[] = complete
+        ? [{ type: 'task_completed', payload: { taskId } }]
+        : []
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          habits,
+          quests,
+          plannerTasks: tasks,
+          streak: globalStreak(habits),
+        },
+        events,
+      )
     })
   }
 
@@ -2942,13 +3111,16 @@ export function useLifeOS(userId: string | null) {
       const habits = s.habits
         .map(normalizeHabit)
         .filter((habit) => habit.id !== target.habitId && habit.plannerTaskId !== taskId)
-      return {
-        ...s,
-        habits,
-        plannerTasks: tasks.filter((task) => task.id !== taskId),
-        quests: syncQuests(habits, s.quests),
-        streak: globalStreak(habits),
-      }
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          habits,
+          plannerTasks: tasks.filter((task) => task.id !== taskId),
+          quests: syncQuests(habits, s.quests),
+          streak: globalStreak(habits),
+        },
+        [{ type: 'task_deleted', payload: { taskId } }],
+      )
     })
   }
 
@@ -2966,15 +3138,18 @@ export function useLifeOS(userId: string | null) {
         size,
       }
 
-      return {
-        ...s,
-        desktop: {
-          ...d,
-          layout: {
-            widgets: [...d.layout.widgets, next],
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          desktop: {
+            ...d,
+            layout: {
+              widgets: [...d.layout.widgets, next],
+            },
           },
         },
-      }
+        [{ type: 'desktop_widget_added', payload: { type } }],
+      )
     })
     return { ok: true }
   }
@@ -3168,25 +3343,46 @@ export function useLifeOS(userId: string | null) {
         )
       }
 
-      return {
-        ...s,
-        goals,
-        habits,
-        quests: createNewHabit ? syncQuests(habits, s.quests) : s.quests,
-        streak: createNewHabit ? globalStreak(habits) : s.streak,
-        diamonds,
-        diamondHistory,
-        desktop: {
-          ...d,
-          moodboard: {
-            ...d.moodboard,
-            stickers:
-              d.moodboard.stickers.length > 200
-                ? d.moodboard.stickers
-                : [...d.moodboard.stickers, nextSticker],
+      const events: AchievementEvent[] = [
+        { type: 'moodboard_sticker_added' },
+      ]
+      if (createNewGoal) {
+        events.push({ type: 'goal_created' })
+        events.push({
+          type: 'diamonds_spent',
+          payload: { amount: ECONOMY.GOAL_COST },
+        })
+      }
+      if (createNewHabit) {
+        events.push({ type: 'habit_created' })
+        events.push({
+          type: 'diamonds_spent',
+          payload: { amount: ECONOMY.HABIT_COST },
+        })
+      }
+
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          goals,
+          habits,
+          quests: createNewHabit ? syncQuests(habits, s.quests) : s.quests,
+          streak: createNewHabit ? globalStreak(habits) : s.streak,
+          diamonds,
+          diamondHistory,
+          desktop: {
+            ...d,
+            moodboard: {
+              ...d.moodboard,
+              stickers:
+                d.moodboard.stickers.length > 200
+                  ? d.moodboard.stickers
+                  : [...d.moodboard.stickers, nextSticker],
+            },
           },
         },
-      }
+        events,
+      )
     })
     return { ok: true, stickerId }
   }
@@ -3609,22 +3805,109 @@ export function useLifeOS(userId: string | null) {
 
     setStore((s) => {
       const diamonds = s.diamonds + normalized
-      return {
-        ...s,
-        diamonds,
-        diamondHistory: pushDiamondTx(
-          s.diamondHistory,
-          makeDiamondTx({
-            amount: normalized,
-            reason: 'tester_grant',
-            label: `Тестер добавил себе ${formatDiamonds(normalized)}`,
-            balanceAfter: diamonds,
-          }),
-        ),
-      }
+      return applyAchievementEventsToStore(
+        {
+          ...s,
+          diamonds,
+          diamondHistory: pushDiamondTx(
+            s.diamondHistory,
+            makeDiamondTx({
+              amount: normalized,
+              reason: 'tester_grant',
+              label: `Тестер добавил себе ${formatDiamonds(normalized)}`,
+              balanceAfter: diamonds,
+            }),
+          ),
+        },
+        [{ type: 'diamonds_earned', payload: { amount: normalized } }],
+      )
     })
 
     return { ok: true }
+  }
+
+  // ——— Achievements API ———
+  useEffect(() => {
+    setStore((s) => {
+      if (s.achievements?.meta?.backfilled) return s
+      return ensureAchievementsBackfilled({
+        ...s,
+        achievements: s.achievements ?? emptyAchievements(),
+      })
+    })
+  }, [activeUserId])
+
+  const trackAchievementEvent = (events: AchievementEvent | AchievementEvent[]) => {
+    const list = Array.isArray(events) ? events : [events]
+    setStore((s) => applyAchievementEventsToStore(s, list))
+  }
+
+  const recordFocusSession = (input?: {
+    minutes?: number
+    uninterrupted?: boolean
+  }) => {
+    trackAchievementEvent({
+      type: 'focus_completed',
+      payload: {
+        minutes: input?.minutes ?? store.focusSettings?.focusMinutes ?? 25,
+        uninterrupted: input?.uninterrupted !== false,
+      },
+    })
+  }
+
+  const trackPageOpen = (page: string) => {
+    trackAchievementEvent({ type: 'page_opened', payload: { page } })
+  }
+
+  const achievementsState = store.achievements ?? emptyAchievements()
+  const achievementViews = useMemo(
+    () => buildAchievementViews(achievementsState),
+    [achievementsState],
+  )
+  const nearestAchievements = useMemo(
+    () => getNearestAchievements(achievementsState, 3),
+    [achievementsState],
+  )
+
+  const ackAchievementUnlocks = (ids: string[]) => {
+    setStore((s) => ({
+      ...s,
+      achievements: acknowledgeUnlocks(
+        s.achievements ?? emptyAchievements(),
+        ids,
+      ),
+    }))
+  }
+
+  const togglePinAchievement = (id: string) => {
+    setStore((s) => ({
+      ...s,
+      achievements: pinAchievement(s.achievements ?? emptyAchievements(), id),
+    }))
+  }
+
+  const selectAchievementTitle = (titleId: string) => {
+    setStore((s) => ({
+      ...s,
+      achievements: setActiveTitle(s.achievements ?? emptyAchievements(), titleId),
+    }))
+  }
+
+  const toggleAchievementSound = (enabled: boolean) => {
+    setStore((s) => ({
+      ...s,
+      achievements: setAchievementSound(
+        s.achievements ?? emptyAchievements(),
+        enabled,
+      ),
+    }))
+  }
+
+  const readAchievementNotifications = () => {
+    setStore((s) => ({
+      ...s,
+      achievements: markNotificationsRead(s.achievements ?? emptyAchievements()),
+    }))
   }
 
   return {
@@ -3724,6 +4007,19 @@ export function useLifeOS(userId: string | null) {
     deleteDesktopArrow,
     updateDesktopMoodboardView,
     addTesterDiamonds,
+    achievements: achievementsState,
+    achievementViews,
+    nearestAchievements,
+    totalAchievements: TOTAL_ACHIEVEMENTS,
+    unlockedAchievementCount: Object.keys(achievementsState.unlocked).length,
+    trackAchievementEvent,
+    trackPageOpen,
+    recordFocusSession,
+    ackAchievementUnlocks,
+    togglePinAchievement,
+    selectAchievementTitle,
+    toggleAchievementSound,
+    readAchievementNotifications,
     dayStatus: (habitId: string, dayIndex: number) => {
       const h = habitsAll.find((x) => x.id === habitId)
       if (!h) return 'after' as const

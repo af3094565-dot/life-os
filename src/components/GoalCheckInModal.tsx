@@ -93,12 +93,13 @@ export function GoalCheckInModal({
                 Текущее значение{goal.unit ? ` · ${goal.unit}` : ''}
               </label>
               <input
-                autoFocus
                 type="number"
+                inputMode="decimal"
+                enterKeyHint="done"
                 step="any"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                className="w-full rounded-xl border border-line bg-canvas px-3 py-2.5 text-sm font-semibold text-ink outline-none focus:ring-2 focus:ring-brand/30"
+                className="w-full min-h-[48px] rounded-xl border border-line bg-canvas px-4 py-3.5 text-base font-semibold text-ink outline-none focus:ring-2 focus:ring-brand/30"
               />
               {goal.targetValue != null && (
                 <p className="mt-1 text-[11px] font-medium text-muted">

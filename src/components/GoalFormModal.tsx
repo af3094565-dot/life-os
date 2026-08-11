@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import type { GoalCadence, GoalMeasureKind } from '../data/seed'
 import type { NewGoalInput } from '../hooks/useLifeOS'
 import { ECONOMY, canAfford, formatDiamonds, goalCostHint, matrixCostHint } from '../lib/economy'
+import { blurActiveInput } from '../hooks/useKeyboardOpen'
 import { StepWizard, type WizardStep } from './StepWizard'
 
 type Props = {
@@ -129,7 +130,6 @@ export function GoalFormModal({
           content: (
             <div className="space-y-2">
               <input
-                autoFocus
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value)
@@ -139,7 +139,10 @@ export function GoalFormModal({
                   }
                 }}
                 placeholder="Например: стать первым на драфте"
-                className={`w-full rounded-xl border bg-canvas px-3 py-3 text-base font-semibold text-ink outline-none placeholder:font-medium placeholder:text-muted focus:ring-2 ${
+                inputMode="text"
+                enterKeyHint="next"
+                autoComplete="off"
+                className={`w-full min-h-[48px] rounded-xl border bg-canvas px-4 py-3.5 text-base font-semibold text-ink outline-none placeholder:font-medium placeholder:text-muted focus:ring-2 ${
                   highlight.name
                     ? 'border-danger ring-2 ring-danger/40'
                     : 'border-line ring-brand/30'
@@ -208,7 +211,6 @@ export function GoalFormModal({
         content: (
           <div className="space-y-2">
             <input
-              autoFocus
               value={name}
               onChange={(e) => {
                 setName(e.target.value)
@@ -218,7 +220,10 @@ export function GoalFormModal({
                 }
               }}
               placeholder="Похудеть / заработать / открыть бизнес…"
-              className={`w-full rounded-xl border bg-canvas px-3 py-3 text-base font-semibold text-ink outline-none placeholder:font-medium placeholder:text-muted focus:ring-2 ${
+              inputMode="text"
+              enterKeyHint="next"
+              autoComplete="off"
+              className={`w-full min-h-[48px] rounded-xl border bg-canvas px-4 py-3.5 text-base font-semibold text-ink outline-none placeholder:font-medium placeholder:text-muted focus:ring-2 ${
                 highlight.name
                   ? 'border-danger ring-2 ring-danger/40'
                   : 'border-line ring-brand/30'
@@ -681,6 +686,7 @@ export function GoalFormModal({
       setError(result.reason ?? 'Недостаточно алмазов')
       return
     }
+    blurActiveInput()
     onClose()
   }
 

@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { BackBar } from '../components/BackBar'
+import { EmptyState } from '../components/EmptyState'
 import { HabitFormModal } from '../components/HabitFormModal'
 import { Header } from '../components/Header'
+import { NextActionCard } from '../components/NextActionCard'
 import { Card, ProgressBar, ProgressRing } from '../components/ui'
 import {
   MONTH_NAMES,
@@ -14,10 +17,47 @@ import { formatRuDate, todayKey, toDateKey } from '../lib/habitLogic'
 import { retroConfirmMessage } from '../lib/retroMarks'
 import { submitHabitWithMoodboardOption } from '../components/desktop/moodboard/placeOnMoodboard'
 
-type Props = { state: LifeOSState; userName: string }
+type Props = {
+  state: LifeOSState
+  userName: string
+  focusHabitId?: string
+  returnLabel?: string | null
+  onBack?: () => void
+  onOpenGoal?: (goalId: string) => void
+  onToast?: (t: {
+    title: string
+    subtitle?: string
+    diamonds?: number
+    streak?: number
+    cta?: string
+    onCta?: () => void
+  }) => void
+}
 
-export function HabitsPage({ state, userName }: Props) {
+export function HabitsPage({
+  state,
+  userName,
+  focusHabitId,
+  returnLabel,
+  onBack,
+  onOpenGoal,
+  onToast,
+}: Props) {
   const [formOpen, setFormOpen] = useState(false)
+  const focusRef = useRef<HTMLTableRowElement | null>(null)
+
+  useEffect(() => {
+    if (!focusHabitId || !focusRef.current) return
+    focusRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [focusHabitId, state.habitStats])
+
+  const pendingToday = state.quests.find((q) => !q.done)
+  const pendingHabit = pendingToday?.habitId
+    ? state.habitStats.find((h) => h.id === pendingToday.habitId)
+    : state.habitStats.find((h) => {
+        if (state.todayIndex < 0) return false
+        return state.dayStatus(h.id, state.todayIndex) !== 'done'
+      })
 
   const weekdayFor = (day: number) => {
     const d = new Date(state.year, state.month, day)
@@ -42,16 +82,53 @@ export function HabitsPage({ state, userName }: Props) {
     : 0
 
   return (
-    <div>
+    <div className="pb-24 md:pb-0">
+      {onBack && returnLabel && <BackBar label={`← ${returnLabel}`} onBack={onBack} />}
       <Header
         greeting="Привычки"
-        subtitle={`${MONTH_NAMES[state.month]} ${state.year} · отмечай каждый день`}
+        subtitle="Что мне нужно повторять? · отмечай каждый день"
         streak={state.streak}
         diamonds={state.diamonds}
         visitStreak={state.visitStreak}
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}
       />
+
+      {pendingHabit && (
+        <NextActionCard
+          className="mb-5"
+          action={`${pendingHabit.emoji} ${pendingHabit.name}`}
+          related={
+            pendingHabit.goalTitle
+              ? `🎯 ${pendingHabit.goalTitle}`
+              : 'Ещё не отмечено сегодня'
+          }
+          relatedHint={pendingHabit.goalTitle ? 'Помогает цели:' : undefined}
+          cta="Отметить"
+          onAction={() => {
+            if (state.todayIndex < 0) return
+            const r = state.toggleHabitDay(pendingHabit.id, state.todayIndex)
+            if (!r.ok) {
+              alert(r.reason)
+              return
+            }
+            onToast?.({
+              title: 'Выполнено',
+              subtitle: pendingHabit.name,
+              streak: state.streak + (state.dayStatus(pendingHabit.id, state.todayIndex) === 'done' ? 0 : 1),
+            })
+          }}
+          secondaryLabel={
+            pendingHabit.goalId && onOpenGoal ? 'Открыть цель' : undefined
+          }
+          onSecondary={
+            pendingHabit.goalId && onOpenGoal
+              ? () => onOpenGoal(pendingHabit.goalId!)
+              : undefined
+          }
+          icon={pendingHabit.emoji}
+        />
+      )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -133,24 +210,90 @@ export function HabitsPage({ state, userName }: Props) {
       </Card>
 
       <Card className="mb-5 overflow-hidden !p-0 animate-fade-up">
-        <div className="overflow-x-auto">
-          {state.habitStats.length === 0 ? (
-            <div className="px-6 py-16 text-center">
-              <p className="text-base font-extrabold text-ink">
-                В этом месяце нет активных привычек
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                Добавь новую или полистай месяцы — привычка видна только в своём сроке
-              </p>
-              <button
-                type="button"
-                onClick={() => setFormOpen(true)}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white"
-              >
-                <Plus size={16} /> Добавить привычку
-              </button>
-            </div>
-          ) : (
+        {state.habitStats.length === 0 ? (
+          <div className="px-4 py-6">
+            <EmptyState
+              emoji="🔁"
+              title="Здесь будут твои привычки"
+              description="Привычка — то, что ты повторяешь регулярно. Она приближает тебя к цели. Создай первую за 30 секунд."
+              cta="Создать привычку"
+              onCta={() => setFormOpen(true)}
+            />
+          </div>
+        ) : (
+          <>
+            {/* Mobile: cards, not a squeezed table */}
+            <ul className="divide-y divide-line md:hidden">
+              {state.habitStats.map((h) => {
+                const p = priorityMeta(h.priority)
+                const focused = focusHabitId === h.id
+                const todayDone =
+                  state.todayIndex >= 0 && !!h.days[state.todayIndex]
+                return (
+                  <li
+                    key={h.id}
+                    ref={
+                      focused
+                        ? (el) => {
+                            focusRef.current = el as unknown as HTMLTableRowElement
+                          }
+                        : undefined
+                    }
+                    className={`p-4 ${focused ? 'bg-brand-soft/40' : ''}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <button
+                        type="button"
+                        disabled={state.todayIndex < 0}
+                        onClick={() => {
+                          if (state.todayIndex < 0) return
+                          const r = state.toggleHabitDay(h.id, state.todayIndex)
+                          if (!r.ok) {
+                            alert(r.reason)
+                            return
+                          }
+                          if (!todayDone) {
+                            onToast?.({
+                              title: 'Отмечено',
+                              subtitle: h.name,
+                            })
+                          }
+                        }}
+                        className={`mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold disabled:opacity-40 ${
+                          todayDone
+                            ? 'border-brand bg-brand text-white'
+                            : 'border-line bg-white text-transparent'
+                        }`}
+                        aria-label={todayDone ? 'Снять отметку' : 'Отметить сегодня'}
+                      >
+                        ✓
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-base font-extrabold text-ink">
+                          {h.emoji} {h.name}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-muted">
+                          {h.pct}% · {h.timesPerWeek}×/нед · {p.label}
+                        </p>
+                        {h.goalTitle && onOpenGoal && h.goalId && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenGoal(h.goalId!)}
+                            className="mt-1 text-left text-xs font-bold text-brand"
+                          >
+                            🎯 {h.goalTitle}
+                          </button>
+                        )}
+                        <ProgressBar value={h.pct} className="mt-3" />
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+
+            {/* Desktop: month grid table */}
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[920px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line bg-canvas/70">
@@ -183,14 +326,30 @@ export function HabitsPage({ state, userName }: Props) {
                 {state.habitStats.map((h) => {
                   const p = priorityMeta(h.priority)
                   const d = durationMeta(h.targetDays)
+                  const focused = focusHabitId === h.id
                   return (
-                    <tr key={h.id} className="border-b border-line last:border-0">
+                    <tr
+                      key={h.id}
+                      ref={focused ? focusRef : undefined}
+                      className={`border-b border-line last:border-0 ${
+                        focused ? 'bg-brand-soft/40' : ''
+                      }`}
+                    >
                       <td className="sticky left-0 z-10 bg-surface px-4 py-2.5">
                         <div className="flex max-w-[260px] flex-col gap-1">
                           <div className="flex items-center gap-2 font-semibold text-ink">
                             <span>{h.emoji}</span>
                             <span className="truncate">{h.name}</span>
                           </div>
+                          {h.goalId && h.goalTitle && onOpenGoal && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenGoal(h.goalId!)}
+                              className="w-fit text-left text-[11px] font-bold text-brand hover:underline"
+                            >
+                              Цель: 🎯 {h.goalTitle}
+                            </button>
+                          )}
                           {h.questTagline && (
                             <p className="text-[11px] font-medium leading-snug text-muted">
                               {h.questTagline}
@@ -329,8 +488,9 @@ export function HabitsPage({ state, userName }: Props) {
                 })}
               </tbody>
             </table>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

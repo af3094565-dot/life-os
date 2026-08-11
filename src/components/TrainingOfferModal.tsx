@@ -1,4 +1,4 @@
-import { GraduationCap } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 
 type Props = {
   open: boolean
@@ -19,28 +19,29 @@ export function TrainingOfferModal({ open, userName, onStart, onSkip }: Props) {
         className="w-full max-w-md rounded-2xl bg-surface p-6 shadow-xl ring-1 ring-line animate-fade-up"
       >
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-brand">
-          <GraduationCap size={24} />
+          <Sparkles size={24} />
         </div>
         <h2 id="training-offer-title" className="text-xl font-extrabold text-ink">
-          Пройти обучение?
+          Соберём твою систему?
         </h2>
-        <p className="mt-2 text-sm font-medium text-muted">
-          {userName}, короткий тур по вкладкам поможет сразу пользоваться Life OS
-          правильно: где привычки, планировщик, прогресс — и что открывается с
-          подпиской.
+        <p className="mt-2 text-sm font-medium leading-relaxed text-muted">
+          {userName}, за пару минут покажем, как из желания получается цель, привычки и
+          план на сегодня — без сложных терминов.
         </p>
-        <ul className="mt-4 space-y-2 rounded-xl bg-canvas px-3 py-3 text-sm font-medium text-ink ring-1 ring-line">
-          <li>1. Бесплатные разделы со всплывающими подсказками</li>
-          <li>2. Предложение колеса баланса (Pro)</li>
-          <li>3. После подписки — цели, матрицы и квесты</li>
-        </ul>
+        <div className="mt-4 space-y-2 rounded-xl bg-canvas px-3 py-3 text-sm font-medium text-ink ring-1 ring-line">
+          <p className="font-extrabold">Ты увидишь цепочку:</p>
+          <p>🎯 Цель → 🔁 Привычки → 📅 План → 🏠 Сегодня → 📊 Прогресс</p>
+          <p className="text-xs font-medium text-muted">
+            Продвинутое (квесты, карта жизни, рабочий стол) — позже, когда освоишь базу.
+          </p>
+        </div>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
           <button
             type="button"
             onClick={onStart}
             className="flex-1 rounded-xl bg-brand px-4 py-2.5 text-sm font-extrabold text-white hover:bg-brand-deep"
           >
-            Начать обучение
+            Да, начать
           </button>
           <button
             type="button"

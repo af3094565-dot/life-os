@@ -1,4 +1,4 @@
-import { X, Plus, Grid3x3, Trophy, Target, KanbanSquare, Type } from 'lucide-react'
+import { X, Plus, Grid3x3, Trophy, Target, KanbanSquare, Type, Home, ListChecks, CircleDot, TrendingUp } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import type { DesktopWidgetSize, DesktopWidgetType } from '../../hooks/useLifeOS'
@@ -22,27 +22,51 @@ const WIDGETS: Array<{
   icon: ComponentType<{ size?: number }>
 }> = [
   {
+    type: 'dashboard',
+    label: 'Сегодня',
+    hint: 'Главный фокус дня',
+    icon: (props) => <Home {...props} />,
+  },
+  {
     type: 'habits',
-    label: 'Трекер привычек',
-    hint: 'Что делать сегодня',
+    label: 'Привычки',
+    hint: 'Что отметить сегодня',
     icon: (props) => <Trophy {...props} />,
   },
   {
     type: 'goals',
-    label: 'Мои цели',
-    hint: 'Активные цели и прогресс',
+    label: 'Цели',
+    hint: 'Куда идёшь и прогресс',
     icon: (props) => <Target {...props} />,
   },
   {
     type: 'planner',
-    label: 'Планировщик',
+    label: 'План дня',
     hint: 'Задачи и фокус',
     icon: (props) => <KanbanSquare {...props} />,
   },
   {
+    type: 'quests',
+    label: 'Квесты',
+    hint: 'Активные испытания',
+    icon: (props) => <ListChecks {...props} />,
+  },
+  {
+    type: 'life-map',
+    label: 'Карта жизни',
+    hint: 'Сферы и баланс',
+    icon: (props) => <CircleDot {...props} />,
+  },
+  {
+    type: 'progress',
+    label: 'Прогресс',
+    hint: 'Получается ли?',
+    icon: (props) => <TrendingUp {...props} />,
+  },
+  {
     type: 'moodboard',
     label: 'Мудборд',
-    hint: 'Стикеры и стрелки',
+    hint: 'Идеи, цели, стрелки',
     icon: (props) => <Grid3x3 {...props} />,
   },
 ]

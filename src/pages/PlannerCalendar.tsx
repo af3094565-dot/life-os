@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Header } from '../components/Header'
+import { PlanTabs } from '../components/PlanTabs'
 import { MONTH_NAMES, type PageId } from '../data/seed'
 import type { LifeOSState } from '../hooks/useLifeOS'
 import { formatRuDate, isDueOnDate, toDateKey } from '../lib/habitLogic'
@@ -129,14 +130,15 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
   return (
     <div>
       <Header
-        greeting="Календарь"
-        subtitle="Чистый месяц и таймлайн дня для задач, целей и планов"
+        greeting="План"
+        subtitle="Календарь · когда что запланировано"
         streak={state.streak}
         diamonds={state.diamonds}
         visitStreak={state.visitStreak}
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}
       />
+      <PlanTabs page="planner-calendar" onNavigate={onNavigate} />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex rounded-2xl bg-canvas p-1 ring-1 ring-line">

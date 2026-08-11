@@ -914,11 +914,14 @@ export function MoodboardWidget({
                 <div className="absolute left-0 top-full z-30 mt-1 w-72 overflow-hidden rounded-xl bg-surface shadow-xl ring-1 ring-line sm:w-80">
                   <div className="border-b border-line p-2">
                     <input
-                      autoFocus
+                      type="search"
+                      inputMode="search"
+                      enterKeyHint="search"
+                      autoComplete="off"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Найти на доске…"
-                      className="w-full rounded-lg bg-canvas px-3 py-2 text-sm font-semibold text-ink outline-none ring-1 ring-line focus:ring-brand/40"
+                      className="w-full min-h-[44px] rounded-lg bg-canvas px-3 py-2.5 text-base font-semibold text-ink outline-none ring-1 ring-line focus:ring-brand/40"
                     />
                   </div>
                   <div className="max-h-64 overflow-y-auto p-1">

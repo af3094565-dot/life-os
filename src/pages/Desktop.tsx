@@ -18,6 +18,7 @@ const WIDGET_OPEN_NAV: Record<DesktopWidgetType, PageId | null> = {
   quests: 'quests',
   'life-map': 'life-map',
   progress: 'progress',
+  achievements: 'achievements',
 }
 
 export function DesktopPage({ state, userName: _userName, onNavigate }: Props) {
@@ -31,9 +32,11 @@ export function DesktopPage({ state, userName: _userName, onNavigate }: Props) {
       <div className="mb-5 rounded-2xl bg-surface p-4 shadow-[0_1px_3px_rgba(26,26,46,0.04)] ring-1 ring-line animate-fade-up">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-muted">Life OS</p>
-            <h1 className="mt-1 text-lg font-extrabold text-ink md:text-[20px]">Мой рабочий стол</h1>
-            <p className="mt-1 text-sm font-medium text-muted">Перетаскивай виджеты, меняй размер и собирай мудборд.</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-muted">Настрой под себя</p>
+            <h1 className="mt-1 text-lg font-extrabold text-ink md:text-[20px]">Рабочий стол</h1>
+            <p className="mt-1 text-sm font-medium text-muted">
+              Персональная панель: виджеты, мудборд, то, что хочешь видеть каждый день.
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -77,10 +80,21 @@ export function DesktopPage({ state, userName: _userName, onNavigate }: Props) {
       />
 
       {widgets.length === 0 && (
-        <Card className="mt-4 animate-fade-up bg-transparent">
-          <p className="text-sm font-medium text-muted">
-            Сетка пустая — нажми «Добавить виджет» и выбери, что закрепить на рабочем столе.
+        <Card className="mt-4 py-10 text-center animate-fade-up">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-soft text-2xl">
+            🖥
+          </div>
+          <p className="mt-4 text-base font-extrabold text-ink">Твой рабочий стол пуст</p>
+          <p className="mx-auto mt-2 max-w-sm text-sm font-medium text-muted">
+            Добавь то, что хочешь видеть каждый день: привычки, цели, план или мудборд.
           </p>
+          <button
+            type="button"
+            onClick={() => setAddWidgetOpen(true)}
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-deep"
+          >
+            <Plus size={16} /> Добавить виджет
+          </button>
         </Card>
       )}
 

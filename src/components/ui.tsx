@@ -4,7 +4,8 @@ type Props = {
   children: ReactNode
   className?: string
   style?: CSSProperties
-} & Pick<HTMLAttributes<HTMLDivElement>, 'data-tour'>
+  'data-tour'?: string
+} & Omit<HTMLAttributes<HTMLDivElement>, 'className' | 'style' | 'children'>
 
 export function Card({ children, className = '', style, ...rest }: Props) {
   return (

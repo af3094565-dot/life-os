@@ -5,6 +5,7 @@ import { HabitFormModal } from '../components/HabitFormModal'
 import { LifeGoalsMap } from '../components/LifeGoalsMap'
 import { LifeMapGoalsTable } from '../components/LifeMapGoalsTable'
 import { LifeWheel } from '../components/LifeWheel'
+import { NextActionCard } from '../components/NextActionCard'
 import { SubscriptionPaywall } from '../components/SubscriptionPaywall'
 import { Card } from '../components/ui'
 import {
@@ -107,7 +108,7 @@ export function LifeMapPage({
       <div>
         <Header
           greeting="Карта жизни"
-          subtitle="Колесо баланса · аспекты · привычки"
+          subtitle="Какие сферы жизни хочешь улучшить?"
           streak={state.streak}
           diamonds={state.diamonds}
           visitStreak={state.visitStreak}
@@ -161,7 +162,7 @@ export function LifeMapPage({
     <div>
       <Header
         greeting="Карта жизни"
-        subtitle="Колесо · карта целей · привычки по аспектам"
+        subtitle="Сфера → цель → привычки → прогресс"
         streak={state.streak}
         diamonds={state.diamonds}
         visitStreak={state.visitStreak}
@@ -202,6 +203,30 @@ export function LifeMapPage({
           )}
         </div>
       </Card>
+
+      {selectedArea && (
+        <NextActionCard
+          className="mb-5"
+          title="Улучшить эту сферу"
+          action={`${selectedArea.emoji} ${selectedArea.title}`}
+          related={
+            areaHabits.length === 0
+              ? 'Пока нет привычек — добавь первую'
+              : `${areaHabits.length} из ${LIFE_AREA_MAX_HABITS} привычек`
+          }
+          relatedHint="Сейчас:"
+          cta={
+            areaHabits.length >= LIFE_AREA_MAX_HABITS
+              ? 'Сфера заполнена'
+              : 'Добавить привычку'
+          }
+          onAction={() => {
+            if (areaHabits.length >= LIFE_AREA_MAX_HABITS) return
+            openAdd(selectedArea.id)
+          }}
+          icon={selectedArea.emoji}
+        />
+      )}
 
       <div className="mb-5">
         <LifeGoalsMap

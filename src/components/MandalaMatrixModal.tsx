@@ -363,16 +363,18 @@ export function MandalaMatrixModal({
               Аспект {pillarEdit + 1}
             </p>
             <input
-              autoFocus
               value={pillarDraft}
               onChange={(e) => setPillarDraft(e.target.value)}
               placeholder="Например: физическая форма"
-              className="mt-2 w-full rounded-xl border border-line bg-canvas px-3 py-2.5 text-sm font-semibold text-ink outline-none focus:ring-2 focus:ring-brand/30"
+              inputMode="text"
+              enterKeyHint="done"
+              autoComplete="off"
+              className="mt-2 w-full min-h-[48px] rounded-xl border border-line bg-canvas px-4 py-3.5 text-base font-semibold text-ink outline-none focus:ring-2 focus:ring-brand/30"
             />
             <button
               type="button"
               onClick={savePillar}
-              className="mt-3 w-full rounded-xl bg-brand px-3 py-2.5 text-sm font-bold text-white"
+              className="mt-3 w-full min-h-[48px] rounded-xl bg-brand px-3 py-3 text-base font-bold text-white active:scale-[0.99]"
             >
               Сохранить аспект
             </button>

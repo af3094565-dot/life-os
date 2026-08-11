@@ -3,9 +3,7 @@ import {
   Check,
   Clock,
   Plus,
-  ScrollText,
   Share2,
-  ShoppingBag,
   Trash2,
   Trophy,
   Users,
@@ -13,8 +11,11 @@ import {
 } from 'lucide-react'
 import { AcceptQuestModal } from '../components/AcceptQuestModal'
 import { AcceptUserQuestModal } from '../components/AcceptUserQuestModal'
+import { BackBar } from '../components/BackBar'
 import { CreateUserQuestModal } from '../components/CreateUserQuestModal'
+import { EmptyState } from '../components/EmptyState'
 import { Header } from '../components/Header'
+import { NextActionCard } from '../components/NextActionCard'
 import { SaleClaimShareModal } from '../components/SaleClaimShareModal'
 import { ShareUserQuestModal } from '../components/ShareUserQuestModal'
 import { SubscriptionPaywall } from '../components/SubscriptionPaywall'
@@ -53,11 +54,14 @@ type Props = {
   onPendingShareHandled?: () => void
   claimNotice?: string | null
   onClaimNoticeHandled?: () => void
+  focusContractId?: string
+  returnLabel?: string | null
+  onBack?: () => void
 }
 type Tab = 'active' | 'catalog' | 'mine' | 'archive'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'active', label: 'Контракты' },
+  { id: 'active', label: 'Активные' },
   { id: 'catalog', label: 'Каталог' },
   { id: 'mine', label: 'Мои' },
   { id: 'archive', label: 'Архив' },
@@ -74,6 +78,9 @@ export function QuestsPage({
   onPendingShareHandled,
   claimNotice,
   onClaimNoticeHandled,
+  focusContractId,
+  returnLabel,
+  onBack,
 }: Props) {
   const [tab, setTab] = useState<Tab>('catalog')
   const [category, setCategory] = useState<QuestCategory | 'all'>('all')
@@ -136,6 +143,12 @@ export function QuestsPage({
     onClaimNoticeHandled?.()
   }, [claimNotice, onClaimNoticeHandled])
 
+  useEffect(() => {
+    if (!focusContractId) return
+    setTab('active')
+    setExpandedId(focusContractId)
+  }, [focusContractId])
+
   const accept = (template: QuestTemplate) => {
     setError('')
     setAccepting(template)
@@ -145,7 +158,7 @@ export function QuestsPage({
     if (!accepting) return
     const result = state.acceptQuest(accepting.id, { reminderTime })
     if (!result.ok) {
-      setError(result.reason ?? 'Не удалось принять контракт')
+      setError(result.reason ?? 'Не удалось принять квест')
       return
     }
     setAccepting(null)
@@ -156,7 +169,7 @@ export function QuestsPage({
     if (!acceptingUser) return
     const result = state.acceptUserQuest(acceptingUser.id)
     if (!result.ok) {
-      setError(result.reason ?? 'Не удалось принять контракт')
+      setError(result.reason ?? 'Не удалось принять квест')
       return
     }
     setAcceptingUser(null)
@@ -203,14 +216,24 @@ export function QuestsPage({
     setSharing(result.listing)
   }
 
+  const focusContract =
+    active.find((c) => c.id === focusContractId) ?? active[0] ?? null
+  const focusHabit = focusContract?.habitId
+    ? state.habitsAll.find((h) => h.id === focusContract.habitId)
+    : null
+  const focusProgress = focusContract
+    ? contractProgress(focusContract, focusHabit)
+    : null
+
   return (
-    <div>
+    <div className="pb-24 md:pb-0">
+      {onBack && returnLabel && <BackBar label={`← ${returnLabel}`} onBack={onBack} />}
       <Header
         greeting="Квесты"
         subtitle={
           hasSubscription
-            ? 'Каталог · свои · поделись любым квестом'
-            : 'Доступно по подписке'
+            ? 'Испытание, которое ты берёшь на себя'
+            : 'Доступно в Pro'
         }
         streak={state.streak}
         diamonds={state.diamonds}
@@ -223,25 +246,43 @@ export function QuestsPage({
         <SubscriptionPaywall feature="quests" onBuy={onBuySubscription} />
       ) : (
       <>
-      <Card className="mb-5 animate-fade-up">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-xl">
-            <h3 className="text-base font-extrabold text-ink">Как работают контракты</h3>
-            <p className="mt-1.5 text-sm font-medium leading-relaxed text-muted">
-              Бери квесты из каталога или создай свой. Любой квест можно отправить друзьям
-              ссылкой — с продажи автор получает 50% цены.
-            </p>
+      {focusContract && focusProgress ? (
+        <NextActionCard
+          className="mb-5"
+          title="Продолжить квест"
+          action={`⚔ ${focusContract.title}`}
+          related={`${focusProgress.current} / ${focusProgress.target} · осталось выполнить сегодня`}
+          relatedHint="Прогресс:"
+          cta="К привычке"
+          onAction={() => {
+            setTab('active')
+            setExpandedId(focusContract.id)
+          }}
+          secondaryLabel="Все квесты"
+          onSecondary={() => setTab('catalog')}
+          icon="⚔"
+        />
+      ) : (
+        <Card className="mb-5 animate-fade-up">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-xl">
+              <h3 className="text-base font-extrabold text-ink">Что такое квест?</h3>
+              <p className="mt-1.5 text-sm font-medium leading-relaxed text-muted">
+                Это испытание на срок: платишь алмазы, выполняешь привычку или список дел —
+                и получаешь награду. Можно взять из каталога или создать свой.
+              </p>
+            </div>
+            <button
+              type="button"
+              data-tour="quests-create"
+              onClick={() => setCreating(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white"
+            >
+              <Plus size={16} /> Создать квест
+            </button>
           </div>
-          <button
-            type="button"
-            data-tour="quests-create"
-            onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white"
-          >
-            <Plus size={16} /> Создать квест
-          </button>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {TABS.map((t) => (
@@ -287,22 +328,15 @@ export function QuestsPage({
       {tab === 'active' && (
         <div className="grid gap-4">
           {active.length === 0 ? (
-            <Card>
-              <div className="py-8 text-center">
-                <ScrollText className="mx-auto mb-3 text-muted" size={28} />
-                <p className="text-base font-extrabold text-ink">Нет активных контрактов</p>
-                <p className="mt-1 text-sm text-muted">
-                  Выбери квест в каталоге или создай свой
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setTab('catalog')}
-                  className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white"
-                >
-                  <ShoppingBag size={16} /> Открыть каталог
-                </button>
-              </div>
-            </Card>
+            <EmptyState
+              emoji="⚔"
+              title="Здесь будут твои испытания"
+              description="Квест — вызов на срок с наградой. Выбери из каталога или создай свой за минуту."
+              cta="Открыть каталог"
+              onCta={() => setTab('catalog')}
+              secondary="Создать квест"
+              onSecondary={() => setCreating(true)}
+            />
           ) : (
             active.map((c, i) => (
               <ContractCard

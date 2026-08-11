@@ -141,11 +141,13 @@ export function CreateUserQuestModal({ open, onClose, onSubmit }: Props) {
               Название
             </span>
             <input
-              autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Например: 21 день без сладкого"
-              className="w-full rounded-xl border border-line bg-canvas px-3 py-3 text-sm font-semibold text-ink outline-none focus:ring-2 focus:ring-brand/30"
+              inputMode="text"
+              enterKeyHint="next"
+              autoComplete="off"
+              className="w-full min-h-[48px] rounded-xl border border-line bg-canvas px-4 py-3.5 text-base font-semibold text-ink outline-none focus:ring-2 focus:ring-brand/30"
             />
           </label>
 

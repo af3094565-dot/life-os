@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react'
 import { Header } from '../components/Header'
+import { PlanTabs } from '../components/PlanTabs'
 import { StepWizard, type WizardStep } from '../components/StepWizard'
 import type { PageId } from '../data/seed'
 import type { FocusProfileId, LifeOSState, PlannerTaskEnergy } from '../hooks/useLifeOS'
@@ -75,12 +76,21 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
   const [taskStep, setTaskStep] = useState(0)
   const [timer, setTimer] = useState<TimerState | null>(null)
   const [now, setNow] = useState(Date.now())
+  const [mobileSectionId, setMobileSectionId] = useState(
+    state.plannerSections[0]?.id ?? '',
+  )
 
   useEffect(() => {
     if (!state.plannerSections.some((section) => section.id === taskSectionId)) {
       setTaskSectionId(state.plannerSections[0]?.id ?? '')
     }
   }, [state.plannerSections, taskSectionId])
+
+  useEffect(() => {
+    if (!state.plannerSections.some((s) => s.id === mobileSectionId)) {
+      setMobileSectionId(state.plannerSections[0]?.id ?? '')
+    }
+  }, [state.plannerSections, mobileSectionId])
 
   useEffect(() => {
     if (!timer) return
@@ -95,6 +105,10 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
     if (timer.phase === 'focus') {
       const completed = timer.completedFocusSessions + 1
       const isLongBreak = completed % settings.sessionsBeforeLongBreak === 0
+      state.recordFocusSession({
+        minutes: settings.focusMinutes,
+        uninterrupted: true,
+      })
       setTimer({
         taskId: timer.taskId,
         phase: isLongBreak ? 'long-break' : 'short-break',
@@ -239,20 +253,23 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
         content: (
           <div className="space-y-3">
             <input
-              autoFocus
               value={taskTitle}
               onChange={(event) => {
                 setTaskTitle(event.target.value)
                 if (event.target.value.trim()) setTaskError('')
               }}
               placeholder="Например: подготовить презентацию"
-              className="w-full rounded-xl border border-line bg-canvas px-3 py-3 text-sm font-semibold text-ink outline-none focus:ring-2 focus:ring-brand/30"
+              inputMode="text"
+              enterKeyHint="next"
+              autoComplete="off"
+              className="w-full min-h-[48px] rounded-xl border border-line bg-canvas px-4 py-3.5 text-base font-semibold text-ink outline-none focus:ring-2 focus:ring-brand/30"
             />
             <textarea
               value={taskNote}
               onChange={(event) => setTaskNote(event.target.value)}
               placeholder="Короткая заметка: что именно нужно сделать"
-              className="min-h-[120px] w-full rounded-xl border border-line bg-canvas px-3 py-3 text-sm font-medium text-ink outline-none focus:ring-2 focus:ring-brand/30"
+              enterKeyHint="done"
+              className="min-h-[120px] w-full rounded-xl border border-line bg-canvas px-4 py-3.5 text-base font-medium text-ink outline-none focus:ring-2 focus:ring-brand/30"
             />
             {taskError && taskStep === 0 && (
               <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-danger">
@@ -344,14 +361,15 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
   return (
     <div>
       <Header
-        greeting="Планировщик"
-        subtitle={`Доска задач и фокус-сессии · сегодня ${state.todayFocusBlocks}/${state.focusSettings.dailyFocusCap} блоков`}
+        greeting="План"
+        subtitle="Что мне нужно сделать? · задачи и фокус"
         streak={state.streak}
         diamonds={state.diamonds}
         visitStreak={state.visitStreak}
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}
       />
+      <PlanTabs page="planner" onNavigate={onNavigate} />
 
       {/* Фокус-профиль и фокус-таймер перенесены вниз страницы */}
 
@@ -386,7 +404,157 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
         </p>
       </Card>
 
-      <Card className="mb-5 overflow-x-auto !p-4 animate-fade-up">
+      <Card className="mb-5 !p-3 animate-fade-up md:!p-4">
+        {/* Mobile: one column at a time */}
+        <div className="md:hidden">
+          <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+            {state.plannerSections.map((section) => {
+              const count = state.plannerTasksDetailed.filter(
+                (t) => t.sectionId === section.id,
+              ).length
+              const active = section.id === mobileSectionId
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => setMobileSectionId(section.id)}
+                  className={`inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ring-1 ${
+                    active
+                      ? 'bg-brand-soft text-brand ring-brand/20'
+                      : 'bg-canvas text-ink ring-line'
+                  }`}
+                >
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: section.color }}
+                  />
+                  {section.title}
+                  <span className="text-xs text-muted">{count}</span>
+                </button>
+              )
+            })}
+          </div>
+          {(() => {
+            const section =
+              state.plannerSections.find((s) => s.id === mobileSectionId) ??
+              state.plannerSections[0]
+            if (!section) {
+              return (
+                <p className="py-6 text-center text-sm font-medium text-muted">
+                  Здесь пока пусто. Создай первый раздел.
+                </p>
+              )
+            }
+            const sectionIndex = state.plannerSections.findIndex(
+              (s) => s.id === section.id,
+            )
+            const tasks = state.plannerTasksDetailed.filter(
+              (task) => task.sectionId === section.id,
+            )
+            return (
+              <div className="rounded-2xl bg-canvas p-3">
+                <div className="mb-3 flex items-center gap-2">
+                  <span
+                    className="h-3 w-3 rounded-full"
+                    style={{ backgroundColor: section.color }}
+                  />
+                  <h3 className="text-base font-extrabold text-ink">{section.title}</h3>
+                  <span className="ml-auto text-xs font-bold text-muted">
+                    {tasks.length}
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {tasks.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-line px-3 py-6 text-center text-sm font-medium text-muted">
+                      Здесь пока пусто
+                    </div>
+                  )}
+                  {tasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="rounded-2xl bg-surface p-4 ring-1 ring-line"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-base font-extrabold text-ink">{task.title}</p>
+                          <p className="mt-1 text-xs font-medium text-muted">
+                            {formatRuDate(task.scheduledFor)} · {task.focusBlocks} блок.
+                          </p>
+                        </div>
+                        {task.completedAt && (
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                            Готово
+                          </span>
+                        )}
+                      </div>
+                      {task.note && (
+                        <p className="mt-2 text-sm font-medium leading-relaxed text-muted">
+                          {task.note}
+                        </p>
+                      )}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => state.togglePlannerTaskDone(task.id)}
+                          className="btn-mobile flex-1 bg-brand text-white"
+                        >
+                          {task.completedAt ? 'Вернуть' : 'Выполнить'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => state.movePlannerTask(task.id, -1)}
+                          disabled={sectionIndex === 0}
+                          className="touch-target rounded-xl bg-canvas px-3 text-muted ring-1 ring-line disabled:opacity-30"
+                          aria-label="Влево"
+                        >
+                          <ArrowLeft size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => state.movePlannerTask(task.id, 1)}
+                          disabled={sectionIndex === state.plannerSections.length - 1}
+                          className="touch-target rounded-xl bg-canvas px-3 text-muted ring-1 ring-line disabled:opacity-30"
+                          aria-label="Вправо"
+                        >
+                          <ArrowRight size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={sectionIndex <= 0}
+                    onClick={() =>
+                      setMobileSectionId(
+                        state.plannerSections[sectionIndex - 1]?.id ?? section.id,
+                      )
+                    }
+                    className="btn-mobile flex-1 bg-surface text-muted ring-1 ring-line disabled:opacity-30"
+                  >
+                    ← Назад
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sectionIndex >= state.plannerSections.length - 1}
+                    onClick={() =>
+                      setMobileSectionId(
+                        state.plannerSections[sectionIndex + 1]?.id ?? section.id,
+                      )
+                    }
+                    className="btn-mobile flex-1 bg-surface text-muted ring-1 ring-line disabled:opacity-30"
+                  >
+                    Далее →
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+
+        {/* Desktop: multi-column board */}
+        <div className="hidden overflow-x-auto md:block">
         <div className="flex min-w-[900px] gap-4">
           {state.plannerSections.map((section, sectionIndex) => {
             const tasks = state.plannerTasksDetailed.filter((task) => task.sectionId === section.id)
@@ -518,6 +686,7 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
               </div>
             )
           })}
+        </div>
         </div>
       </Card>
 
