@@ -21,7 +21,7 @@ export function syncLifeHistory<T extends {habits:Habit[];life?:LifeData}>(previ
  for(const old of previous.habits) if(!next.habits.some(h=>h.id===old.id)&&!archived.some(h=>h.id===old.id)){archived.push({...old});changed=true}
  for(const h of [...next.habits,...archived]) {
   if(h.fromPlanner || h.intent==='reduce') continue
-  const id=h.directionId??h.id; let direction=directions.find(d=>d.id===id)
+  const id=h.directionId??h.id; if(life.hiddenDirectionIds?.includes(id))continue; let direction=directions.find(d=>d.id===id)
   const archivedFlag=!next.habits.some(x=>x.id===h.id)
   const version={name:h.name,sphere:h.sphere,category:h.category,importance:h.importance,tags:h.tags,goalId:h.goalId,archived:archivedFlag}
   if(!direction){direction={id,habitIds:[h.id],createdAt:h.createdAt,versions:[{...version,at:h.createdAt}]};directions.push(direction);changed=true}

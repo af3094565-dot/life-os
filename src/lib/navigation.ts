@@ -40,6 +40,8 @@ export function pageLabel(page: PageId): string {
       return 'Карта жизни'
     case 'progress':
       return 'Статистика'
+    case 'neurons':
+      return 'Нейроны'
     case 'achievements':
       return 'Достижения'
     default:

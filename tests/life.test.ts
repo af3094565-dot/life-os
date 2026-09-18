@@ -58,3 +58,12 @@ test('patterns require four days and exclude overlapping sequences',()=>{
  assert.equal(dayPatterns(l,'2026-09-18').length,1)
  l.events=l.events.map(e=>({...e,end:'23:00'}));assert.equal(dayPatterns(l,'2026-09-18').length,0)
 })
+import { neuronsAt } from '../src/lib/life/neurons.ts'
+test('neuron past views exclude future actions and retain archived history',()=>{
+ const l=emptyLife();l.directions=[{id:'h',createdAt:habit.createdAt,habitIds:['h'],versions:[{at:habit.createdAt,name:'English'},{at:'2025-01-01T12:00:00',name:'English',archived:true}]}];l.archivedHabits=[{...habit,completions:{...habit.completions,'2025-02-01':true}}]
+ assert.equal(neuronsAt(l,[],'2023-12-31').length,0)
+ assert.equal(neuronsAt(l,[],'2024-01-31')[0].activeDays,1)
+ assert.equal(neuronsAt(l,[],'2024-01-31')[0].archived,undefined)
+ assert.equal(neuronsAt(l,[],'2025-02-28')[0].activeDays,2)
+ assert.equal(neuronsAt(l,[],'2025-02-28')[0].archived,true)
+})

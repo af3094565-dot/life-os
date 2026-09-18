@@ -12,6 +12,7 @@ export type PageId =
   | 'life-map'
   | 'progress'
   | 'achievements'
+  | 'neurons'
 
 export type HabitPriority = 'important' | 'urgent' | 'low'
 

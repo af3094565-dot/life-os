@@ -1,3 +1,4 @@
+import { NeuronsPage } from './pages/Neurons'
 import { TrackingSettings } from './components/life/TrackingSettings'
 import { useCallback, useEffect, useState } from 'react'
 import { AccountPanel } from './components/AccountPanel'
@@ -451,6 +452,7 @@ export default function App() {
               onNavigate={go}
             />
           )}
+          {page === 'neurons' && <NeuronsPage state={state} userName={userName} />}
           {page === 'achievements' && (
             <AchievementsPage state={state} userName={userName} onNavigate={go} />
           )}

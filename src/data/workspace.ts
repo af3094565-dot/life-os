@@ -5,7 +5,7 @@ export const WORKSPACE_SECTIONS = [
   { id: 'today', label: 'Сегодня', hint: 'Следующий шаг', page: 'dashboard', icon: Home, pages: ['dashboard'] },
   { id: 'plan', label: 'Мой план', hint: 'Что делать и когда', page: 'habits', icon: CalendarDays, pages: ['habits', 'planner', 'planner-calendar'] },
   { id: 'growth', label: 'Мои цели', hint: 'Ради чего я действую', page: 'goals', icon: Target, pages: ['goals', 'life-map', 'quests', 'desktop'] },
-  { id: 'results', label: 'Результаты', hint: 'Что уже получается', page: 'progress', icon: ChartNoAxesCombined, pages: ['progress', 'achievements'] },
+  { id: 'results', label: 'Результаты', hint: 'Что уже получается', page: 'progress', icon: ChartNoAxesCombined, pages: ['progress', 'achievements', 'neurons'] },
 ] satisfies { id: string; label: string; hint: string; page: PageId; icon: typeof Home; pages: PageId[] }[]
 
 export const PAGE_GUIDE: Record<PageId, { label: string; tour: string; pro?: boolean; description: string; next: PageId; nextLabel: string }> = {
@@ -18,6 +18,7 @@ export const PAGE_GUIDE: Record<PageId, { label: string; tour: string; pro?: boo
   quests: { label: 'Квесты', tour: 'nav-quests', pro: true, description: 'Закрепи регулярность испытанием на срок. Связанную привычку можно выполнять прямо на главной.', next: 'dashboard', nextLabel: 'Выполнить шаг сегодня' },
   desktop: { label: 'Доска идей', tour: 'nav-desktop', description: 'Собери идеи, цели и заметки рядом. Превращай записи в цели и привычки, когда будешь готов.', next: 'goals', nextLabel: 'От идеи к цели' },
   progress: { label: 'Статистика', tour: 'nav-progress', description: 'Посмотри, какие действия дают результат. Скорректируй план и продолжай в удобном ритме.', next: 'habits', nextLabel: 'Скорректировать привычки' },
+  neurons: { label: 'Нейроны', tour: 'nav-neurons', description: 'История направлений, которые ты развивал в себе. Активные и завершённые остаются частью карты.', next: 'progress', nextLabel: 'Посмотреть динамику' },
   achievements: { label: 'Достижения', tour: 'nav-achievements', description: 'Твои действия в привычках, целях и квестах складываются в достижения.', next: 'dashboard', nextLabel: 'Продолжить сегодня' },
 }
 
