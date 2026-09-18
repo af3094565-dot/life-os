@@ -133,7 +133,6 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
     date.setDate(weekStart.getDate() + index)
     return date
   })
-  const hours = Array.from({ length: 24 }, (_, index) => index)
 
   return (
     <div>
@@ -445,112 +444,10 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
       )}
 
       {view === 'day' && <DayState state={state} date={selectedDate} />}
-      {view === 'day' && <DayHistory state={state} date={selectedDate} />}
-      {view === 'day' && (
-        <Card className="animate-fade-up">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-base font-extrabold text-ink">План на день</h3>
-              <p className="mt-1 text-sm font-medium text-muted">{formatRuDate(selectedDate)}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const date = new Date(selectedDateObj)
-                  date.setDate(date.getDate() - 1)
-                  setSelectedDate(toDateKey(date))
-                }}
-                className="rounded-xl bg-canvas p-2 ring-1 ring-line hover:bg-surface"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const date = new Date(selectedDateObj)
-                  date.setDate(date.getDate() + 1)
-                  setSelectedDate(toDateKey(date))
-                }}
-                className="rounded-xl bg-canvas p-2 ring-1 ring-line hover:bg-surface"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {hours.map((hour) => {
-              const hourLabel = `${String(hour).padStart(2, '0')}:00`
-              const items = selectedDayItems.filter((item) => (item.time ?? '').startsWith(String(hour).padStart(2, '0')))
-              return (
-                <div key={hour} className="grid gap-3 border-t border-line pt-3 md:grid-cols-[80px_1fr]">
-                  <div className="text-sm font-bold text-muted">{hourLabel}</div>
-                  <div className="space-y-2">
-                    {items.length === 0 ? (
-                      <div className="rounded-xl bg-canvas/60 px-3 py-3 text-sm font-medium text-muted">
-                        Нет записей плана
-                      </div>
-                    ) : (
-                      items.map((item) => (
-                        <button
-                          key={`${item.type}-${item.id}`}
-                          type="button"
-                          onClick={() =>
-                            setSelectedItem(
-                              item.type === 'task'
-                                ? { type: 'task', id: item.id }
-                                : item.type === 'goal'
-                                  ? { type: 'goal', id: item.id }
-                                  : { type: 'habit', id: item.id },
-                            )
-                          }
-                          className="w-full rounded-2xl bg-canvas px-4 py-3 text-left ring-1 ring-line transition hover:bg-surface"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`h-2.5 w-2.5 rounded-full ${
-                                item.done
-                                  ? 'bg-emerald-500'
-                                  : item.type === 'task'
-                                    ? 'bg-violet-500'
-                                    : item.type === 'goal'
-                                      ? 'bg-amber-500'
-                                      : 'bg-sky-500'
-                              }`}
-                            />
-                            <span className="text-sm font-extrabold text-ink">{item.label}</span>
-                            <span className="text-xs font-bold text-muted">{item.time}</span>
-                          </div>
-                          <div className="mt-1 text-xs font-medium text-muted">{item.meta}</div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-
-            {selectedDayItems.filter((item) => !item.time).length > 0 && (
-              <div className="grid gap-3 border-t border-line pt-3 md:grid-cols-[80px_1fr]">
-                <div className="text-sm font-bold text-muted">Весь день</div>
-                <div className="space-y-2">
-                  {selectedDayItems
-                    .filter((item) => !item.time)
-                    .map((item) => (
-                      <div
-                        key={`${item.type}-${item.id}`}
-                        className="rounded-2xl bg-canvas px-4 py-3 text-sm font-semibold text-ink ring-1 ring-line"
-                      >
-                        {item.label}
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
+      {view === 'day' && <>
+        <div className="mb-3 flex items-center justify-between gap-3"><button className="life-button secondary" aria-label="Предыдущий день" onClick={()=>{const d=new Date(selectedDateObj);d.setDate(d.getDate()-1);setSelectedDate(toDateKey(d))}}><ChevronLeft size={18}/></button><strong>{formatRuDate(selectedDate)}</strong><button className="life-button secondary" aria-label="Следующий день" onClick={()=>{const d=new Date(selectedDateObj);d.setDate(d.getDate()+1);setSelectedDate(toDateKey(d))}}><ChevronRight size={18}/></button></div>
+        <DayHistory state={state} date={selectedDate} plan={selectedDayItems} onOpenPlan={type=>onNavigate(type==='task'?'planner':type==='goal'?'goals':'habits')}/>
+      </>}
 
       {view === 'week' && (
         <Card className="animate-fade-up">
@@ -582,6 +479,7 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
             </div>
           </div>
 
+          <div className="mb-4 flex flex-wrap gap-3 text-sm text-muted">{([['mood','Настроение'],['sleep','Сон, ч'],['felt-energy','Энергия'],['rating','Моя оценка']] as const).map(([metric,label])=>{const values=weekDays.map(d=>calendarMetric(state.life,state.habitsAll,toDateKey(d),metric)).filter((v):v is number=>v!==undefined);return <span key={metric}>{label}: <b>{values.length?(values.reduce((a,b)=>a+b,0)/values.length).toFixed(1):'—'}</b> · {values.length}/7 дней</span>})}</div>
           <div className="grid gap-3 md:grid-cols-7">
             {weekDays.map((date) => {
               const key = toDateKey(date)

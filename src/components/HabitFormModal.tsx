@@ -1,5 +1,5 @@
 import { HabitTrackingFields } from './life/HabitTrackingFields'
-import type { HabitTracking } from '../lib/life/types'
+import type { HabitTracking, Sphere } from '../lib/life/types'
 import { useEffect, useMemo, useState } from 'react'
 import { Lightbulb } from 'lucide-react'
 import {
@@ -41,6 +41,8 @@ type Props = {
   habit?: Habit | null
   habits?: Habit[]
   directionLocked?: boolean
+  directions?: {id:string;name:string}[]
+  sphereNames?: Record<Sphere,string>
   goals?: Goal[]
   defaultGoalId?: string
   diamonds?: number
@@ -67,6 +69,8 @@ export function HabitFormModal({
   habit = null,
   habits = [],
   directionLocked = false,
+  directions = [],
+  sphereNames,
   goals = [],
   defaultGoalId,
   diamonds = ECONOMY.START_DIAMONDS,
@@ -108,7 +112,7 @@ export function HabitFormModal({
 
   useEffect(() => {
     if (!open) return
-    setTracking(habit ? {quantityTarget:habit.quantityTarget,unit:habit.unit,sphere:habit.sphere,category:habit.category,importance:habit.importance,tags:habit.tags,intent:habit.intent,limit:habit.limit,alternative:habit.alternative,alternativeHabitId:habit.alternativeHabitId} : {})
+    setTracking(habit ? {quantityTarget:habit.quantityTarget,unit:habit.unit,sphere:habit.sphere,category:habit.category,importance:habit.importance,tags:habit.tags,intent:habit.intent,limit:habit.limit,alternative:habit.alternative,alternativeHabitId:habit.alternativeHabitId,directionId:habit.directionId} : {})
     if (habit) {
       setName(habit.name)
       setEmoji(habit.emoji || defaultEmoji)
@@ -189,7 +193,7 @@ export function HabitFormModal({
                 : 'border-line ring-brand/30'
             }`}
           />
-          <HabitTrackingFields value={tracking} onChange={setTracking} locked={directionLocked} habits={habits.filter(h=>h.id!==habit?.id&&h.intent!=="reduce")} />
+          <HabitTrackingFields value={tracking} onChange={setTracking} sphereNames={sphereNames} directions={isEdit?[]:directions} locked={directionLocked} habits={habits.filter(h=>h.id!==habit?.id&&h.intent!=="reduce")} />
           {highlight.name && (
             <p className="text-sm font-semibold text-danger">
               Заполни название — без него привычку не создать
@@ -563,7 +567,7 @@ export function HabitFormModal({
     list.push(reminderStep, freqStep, priorityStep, durationStep, confirmStep)
     return list
   }, [
-    tracking, habits, directionLocked, habit,
+    tracking, habits, directionLocked, habit, directions, sphereNames,
     name,
     emoji,
     goals,

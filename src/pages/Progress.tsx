@@ -1,3 +1,4 @@
+import { LifeAnalytics } from '../components/life/LifeAnalytics'
 import { PatternPanel } from '../components/life/Choices'
 import {
   Area,
@@ -35,7 +36,7 @@ export function ProgressPage({ state, userName, onNavigate }: Props) {
     done: d.done,
   }))
 
-  const ranked = [...state.habitStats].sort((a, b) => b.pct - a.pct)
+  const ranked = state.habitStats.filter(h=>h.intent!=="reduce").sort((a, b) => b.pct - a.pct)
   const best = ranked[0]
   const weak = state.weakHabits[0]
   const activeGoals = state.customGoalStats.filter((g) => g.status === 'active').length
@@ -44,7 +45,7 @@ export function ProgressPage({ state, userName, onNavigate }: Props) {
 
   return (
     <div className="pb-24 md:pb-0">
-      <PatternPanel state={state} />
+
       <div className="mb-5 md:hidden">
         <h1 className="text-[28px] font-extrabold tracking-tight text-ink">Статистика</h1>
         {state.streak > 0 && (
@@ -109,6 +110,9 @@ export function ProgressPage({ state, userName, onNavigate }: Props) {
         userName={userName}
       />
       </div>
+
+      {(state.life.events.length>0||state.life.marks.length>0||Object.keys(state.life.days).length>0||state.habitsAll.some(h=>Object.keys(h.completions).length>0))&&<LifeAnalytics state={state} />}
+      <PatternPanel state={state} />
 
       <Card className="mb-5 hidden animate-fade-up md:block">
         <p className="text-[11px] font-bold uppercase tracking-wide text-muted">

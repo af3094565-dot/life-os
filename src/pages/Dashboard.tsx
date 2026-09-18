@@ -200,7 +200,7 @@ export function Dashboard({
         userName={userName}
       />
       <ChoiceMoment state={state} />
-      <DayState state={state} date={dateKey()} />
+      {(state.life.indicators.some(i=>i.enabled)||state.todayDone>0||state.life.days[dateKey()])&&<DayState state={state} date={dateKey()} />}
 
 
       <DashboardOverview state={state} done={doneCount} total={totalCount} goals={activeGoals.length}

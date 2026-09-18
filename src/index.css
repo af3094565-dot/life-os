@@ -265,7 +265,7 @@ select {
 }
 .workspace-main { width: 100%; max-width: 1512px; margin: 0 auto; }
 .workspace-page-content { max-width: 1320px; margin: 0 auto; }
-.workspace-sidebar { display: flex; flex-direction: column; width: 228px; height: 100%; padding: 30px 18px 16px; background: white; border-right: 1px solid var(--color-line); }
+.workspace-sidebar { overflow-y: auto; display: flex; flex-direction: column; width: 228px; height: 100%; padding: 30px 18px 16px; background: white; border-right: 1px solid var(--color-line); }
 .workspace-logo { display: flex; align-items: center; gap: 10px; text-align: left; padding: 0 8px; }
 .workspace-logo > span { display: flex; align-items: center; justify-content: center; width: 39px; height: 39px; background: #7955ad; color: white; border-radius: 13px; }
 .workspace-logo strong { display: block; font-size: 20px; letter-spacing: -.6px; }

@@ -103,6 +103,7 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
       const isLongBreak = completed % settings.sessionsBeforeLongBreak === 0
       state.recordFocusSession({
         taskId: timer.taskId,
+        sessionId: `focus-${timer.taskId}-${timer.phaseEndsAt}`,
         minutes: settings.focusMinutes,
         uninterrupted: true,
       })

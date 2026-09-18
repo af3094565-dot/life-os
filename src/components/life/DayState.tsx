@@ -1,20 +1,243 @@
-import { useState } from 'react'
-import type { LifeOSState } from '../../hooks/useLifeOS'
-import { dateKey, uid } from '../../lib/life/model'
-import { dayAnalysis, indicatorValue } from '../../lib/life/metrics'
-import { BottomSheet } from '../mobile/BottomSheet'
-import { Card } from '../ui'
-export function DayState({state,date}:{state:LifeOSState;date:string}) {
- const [open,setOpen]=useState(false);const enabled=state.life.indicators.filter(i=>i.enabled)
- const [indicator,setIndicator]=useState('');const selected=enabled.find(i=>i.id===indicator)??enabled[0]
- const [value,setValue]=useState('');const [time,setTime]=useState(new Date().toTimeString().slice(0,5));const [error,setError]=useState('')
- const analysis=dayAnalysis(state.life,date);const marks=state.life.marks.filter(m=>m.date===date)
- return <Card className="mb-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-extrabold">Как прошёл день</h3><p className="life-muted">Твои ощущения и ориентиры · {date}</p></div>{enabled.length>0&&<button className="life-button secondary" disabled={date>dateKey()} onClick={()=>{setValue('');setOpen(true)}}>Отметить состояние</button>}</div>
- <div className="mt-4 flex flex-wrap gap-3">{enabled.map(i=>{const v=indicatorValue(state.life,i.id,date);return v?<div key={i.id} className="rounded-xl bg-canvas p-3"><p className="life-muted">{i.name}</p><p className="font-bold">{Math.round(v.value*10)/10} {i.unit}</p><p className="text-xs text-muted">{v.count} отметок</p></div>:null})}</div>
- {!enabled.length&&<p className="life-muted mt-2">Настрой показатели, если хочешь замечать изменения самочувствия.</p>}
- <div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="life-form font-bold">Моя оценка<select aria-label="Моя оценка дня" disabled={date>dateKey()} value={state.life.days[date]?.rating??''} onChange={e=>state.updateLife(l=>({...l,days:{...l.days,[date]:{...l.days[date],rating:e.target.value?Number(e.target.value):undefined}}}))}><option value="">Не оценивал</option>{Array.from({length:10},(_,i)=><option key={i+1} value={i+1}>{i+1} / 10</option>)}</select></label><div><p className="font-bold">Анализ дня</p><p>{analysis.score===undefined?'Недостаточно данных':`${analysis.score}% своих ориентиров`}</p><p className="life-muted">Данные: {analysis.known} из {analysis.total}. Это не оценка качества жизни.</p></div></div>
- {analysis.parts.length>0&&<details className="mt-3 life-muted"><summary>Как посчитано</summary><p>Среднее выполнение с весами: Основа — 3, Важно — 2, Личное — 1. Неизвестные данные исключены.</p>{analysis.parts.map(p=><p key={p.id}>{p.name}: {Math.round(p.value*10)/10} / {p.target} · {Math.round(p.percent)}% · вес {p.weight}</p>)}</details>}
- {marks.length>0&&<details className="mt-3 life-muted"><summary>Отметки в течение дня ({marks.length})</summary>{marks.map(m=><div key={m.id} className="flex items-center justify-between gap-2"><span>{m.time??'Без времени'} · {state.life.indicators.find(i=>i.id===m.indicatorId)?.name} · {m.value}</span><button className="min-h-11 text-brand" onClick={()=>state.updateLife(l=>({...l,marks:l.marks.filter(x=>x.id!==m.id)}))}>Удалить</button></div>)}</details>}
- <BottomSheet open={open} onClose={()=>setOpen(false)} title="Быстрая отметка"><form className="life-form space-y-3" onSubmit={e=>{e.preventDefault();if(!selected)return;const v=Number(value);if(value===''||!Number.isFinite(v)||v<0||(selected.kind==='scale'&&(v<1||v>10))){setError('Укажи значение в допустимом диапазоне');return}state.updateLife(l=>({...l,marks:[...l.marks,{id:uid(),indicatorId:selected.id,date,time:time||undefined,value:v,target:selected.target,importance:selected.importance}]}));setOpen(false);setError('')}}><label>Показатель<select value={selected?.id??''} onChange={e=>{setIndicator(e.target.value);setValue('')}}>{enabled.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></label><label>Значение ({selected?.unit})<input type="number" min={selected?.kind==='scale'?1:0} max={selected?.kind==='scale'?10:undefined} step="any" required value={value} onChange={e=>setValue(e.target.value)}/></label>{selected?.id==='stress'&&<p className="life-muted">1 — почти нет напряжения, 10 — очень сильное.</p>}<label>Время, необязательно<input type="time" value={time} onChange={e=>setTime(e.target.value)}/></label>{error&&<p role="alert">{error}</p>}<button className="life-button">Сохранить отметку</button></form></BottomSheet>
- </Card>
+import { useState } from "react";
+import type { LifeOSState } from "../../hooks/useLifeOS";
+import { dateKey, uid } from "../../lib/life/model";
+import { dayAnalysis, indicatorValue } from "../../lib/life/metrics";
+import { BottomSheet } from "../mobile/BottomSheet";
+import { Card } from "../ui";
+export function DayState({
+  state,
+  date,
+}: {
+  state: LifeOSState;
+  date: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const enabled = state.life.indicators.filter((i) => i.enabled);
+  const [indicator, setIndicator] = useState("");
+  const selected = enabled.find((i) => i.id === indicator) ?? enabled[0];
+  const [value, setValue] = useState("");
+  const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
+  const [error, setError] = useState("");
+  const analysis = dayAnalysis(state.life, date);
+  const marks = state.life.marks.filter((m) => m.date === date);
+  return (
+    <Card className="mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="font-extrabold">Как прошёл день</h3>
+          <p className="life-muted">Твои ощущения и ориентиры · {date}</p>
+        </div>
+        {enabled.length > 0 && (
+          <button
+            className="life-button secondary"
+            disabled={date > dateKey()}
+            onClick={() => {
+              setValue("");
+              setOpen(true);
+            }}
+          >
+            Отметить состояние
+          </button>
+        )}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-3">
+        {enabled.map((i) => {
+          const v = indicatorValue(state.life, i.id, date);
+          return v ? (
+            <div key={i.id} className="rounded-xl bg-canvas p-3">
+              <p className="life-muted">{i.name}</p>
+              <p className="font-bold">
+                {Math.round(v.value * 10) / 10} {i.unit}
+              </p>
+              <p className="text-xs text-muted">{v.count} отметок</p>
+            </div>
+          ) : null;
+        })}
+      </div>
+      {!enabled.length && (
+        <p className="life-muted mt-2">
+          Настрой показатели, если хочешь замечать изменения самочувствия.
+        </p>
+      )}
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <label className="life-form font-bold">
+          Моя оценка
+          <select
+            aria-label="Моя оценка дня"
+            disabled={date > dateKey()}
+            value={state.life.days[date]?.rating ?? ""}
+            onChange={(e) =>
+              state.updateLife((l) => ({
+                ...l,
+                days: {
+                  ...l.days,
+                  [date]: {
+                    ...l.days[date],
+                    rating: e.target.value ? Number(e.target.value) : undefined,
+                  },
+                },
+              }))
+            }
+          >
+            <option value="">Не оценивал</option>
+            {Array.from({ length: 10 }, (_, i) => (
+              <option key={i + 1} value={i + 1}>
+                {i + 1} / 10
+              </option>
+            ))}
+          </select>
+        </label>
+        <div>
+          <p className="font-bold">Анализ дня</p>
+          <p>
+            {analysis.score === undefined
+              ? "Недостаточно данных"
+              : `${analysis.score}% своих ориентиров`}
+          </p>
+          <p className="life-muted">
+            Данные: {analysis.known} из {analysis.total}. Это не оценка качества
+            жизни.
+          </p>
+        </div>
+      </div>
+      {analysis.parts.length > 0 && (
+        <details className="mt-3 life-muted">
+          <summary>Как посчитано</summary>
+          <p>
+            Среднее выполнение с весами: Основа — 3, Важно — 2, Личное — 1.
+            Неизвестные данные исключены.
+          </p>
+          {analysis.parts.map((p) => (
+            <p key={p.id}>
+              {p.name}: {Math.round(p.value * 10) / 10} / {p.target} ·{" "}
+              {Math.round(p.percent)}% · вес {p.weight}
+            </p>
+          ))}
+        </details>
+      )}
+      {marks.length > 0 && (
+        <details className="mt-3 life-muted">
+          <summary>Отметки в течение дня ({marks.length})</summary>
+          {marks.map((m) => (
+            <div key={m.id} className="flex items-center justify-between gap-2">
+              <span>
+                {m.time ?? "Без времени"} ·{" "}
+                {
+                  state.life.indicators.find((i) => i.id === m.indicatorId)
+                    ?.name
+                }{" "}
+                · {m.value}
+              </span>
+              <button
+                className="min-h-11 text-brand"
+                onClick={() =>
+                  state.updateLife((l) => ({
+                    ...l,
+                    marks: l.marks.filter((x) => x.id !== m.id),
+                  }))
+                }
+              >
+                Удалить
+              </button>
+            </div>
+          ))}
+        </details>
+      )}
+      <BottomSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Быстрая отметка"
+      >
+        <form
+          className="life-form space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!selected) return;
+            const v = Number(value);
+            if (
+              value === "" ||
+              !Number.isFinite(v) ||
+              v < 0 ||
+              (selected.kind === "scale" && (v < 1 || v > 10))
+            ) {
+              setError("Укажи значение в допустимом диапазоне");
+              return;
+            }
+            state.updateLife((l) => ({
+              ...l,
+              marks: [
+                ...l.marks.filter(
+                  (m) =>
+                    selected.kind === "scale" ||
+                    m.date !== date ||
+                    m.indicatorId !== selected.id,
+                ),
+                {
+                  id: uid(),
+                  indicatorId: selected.id,
+                  date,
+                  time: time || undefined,
+                  value: v,
+                  target: selected.target,
+                  importance: selected.importance,
+                },
+              ],
+            }));
+            setOpen(false);
+            setError("");
+          }}
+        >
+          <label>
+            Показатель
+            <select
+              value={selected?.id ?? ""}
+              onChange={(e) => {
+                setIndicator(e.target.value);
+                setValue("");
+              }}
+            >
+              {enabled.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Значение ({selected?.unit})
+            <input
+              type="number"
+              min={selected?.kind === "scale" ? 1 : 0}
+              max={selected?.kind === "scale" ? 10 : undefined}
+              step="any"
+              required
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </label>
+          {selected?.kind === "number" && (
+            <p className="life-muted">
+              Укажи итог за день. Новая запись заменит предыдущий итог этого
+              показателя.
+            </p>
+          )}
+          {selected?.id === "stress" && (
+            <p className="life-muted">
+              1 — почти нет напряжения, 10 — очень сильное.
+            </p>
+          )}
+          <label>
+            Время, необязательно
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+            />
+          </label>
+          {error && <p role="alert">{error}</p>}
+          <button className="life-button">Сохранить отметку</button>
+        </form>
+      </BottomSheet>
+    </Card>
+  );
 }

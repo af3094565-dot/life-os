@@ -359,7 +359,8 @@ export default function App() {
       <div className="flex min-w-0 flex-1 flex-col">
         <main className="workspace-main app-main-scroll flex-1 overflow-auto px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 md:p-7 md:pb-7">
           {state.syncError && <p role="status" className="mb-3 rounded-xl bg-amber-50 p-3 text-sm">{state.syncError} <button className="underline" onClick={() => window.location.reload()}>Повторить</button></p>}
-          <SectionNavigation page={page} hasSubscription={auth.hasSubscription} onNavigate={(p) => navigate(p)} />
+          {state.syncConflict && <div className="mb-3 flex flex-wrap gap-2"><button className="life-button" onClick={()=>state.resolveSyncConflict('local')}>Продолжить с этой копией</button><button className="life-button secondary" onClick={()=>state.resolveSyncConflict('cloud')}>Использовать облачную копию</button></div>}
+          <SectionNavigation hasDevelopment={state.life.directions.length>0} page={page} hasSubscription={auth.hasSubscription} onNavigate={(p) => navigate(p)} />
           <div className="workspace-page-content" key={page}>
           {page === 'dashboard' && (
             <Dashboard
@@ -477,6 +478,9 @@ export default function App() {
       />
 
       <HabitFormModal
+        sphereNames={state.life.sphereNames}
+        habits={state.habitsAll}
+        directions={state.life.directions.map(d=>({id:d.id,name:d.versions.at(-1)?.name??d.id}))}
         open={habitFormOpen}
         onClose={() => setHabitFormOpen(false)}
         diamonds={state.diamonds}

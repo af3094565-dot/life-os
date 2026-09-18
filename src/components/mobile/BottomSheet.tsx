@@ -36,12 +36,25 @@ export function BottomSheet({
 }: Props) {
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
   const touchStartY = useRef<number | null>(null)
 
   useEffect(() => {
     if (!open) return
+    const previousFocus = document.activeElement as HTMLElement | null
+    panelRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      const panels = document.querySelectorAll('[role="dialog"][aria-modal="true"]')
+      if(panels[panels.length-1]!==panelRef.current)return
+      if (e.key === 'Escape') closeRef.current()
+      if(e.key==='Tab') {
+        const items=Array.from(panelRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex="0"]')??[]).filter(el=>el.offsetParent!==null)
+        const first=items[0],last=items.at(-1)
+        if(!first){e.preventDefault();return}
+        if(e.shiftKey&&(document.activeElement===first||document.activeElement===panelRef.current)){e.preventDefault();last?.focus()}
+        else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+      }
     }
     window.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
@@ -49,8 +62,9 @@ export function BottomSheet({
     return () => {
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
+      previousFocus?.focus()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 
@@ -62,6 +76,7 @@ export function BottomSheet({
     >
       <div
         ref={panelRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}

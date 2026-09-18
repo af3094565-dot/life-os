@@ -85,8 +85,9 @@ export function HabitsPage({
     state.setMonth(y, m)
   }
 
-  const avgStrength = state.habitStats.length
-    ? state.habitStats.reduce((a, h) => a + h.formPct, 0) / state.habitStats.length
+  const growthStats = state.habitStats.filter(h=>h.intent!=="reduce")
+  const avgStrength = growthStats.length
+    ? growthStats.reduce((a, h) => a + h.formPct, 0) / growthStats.length
     : 0
 
   return (
@@ -279,7 +280,7 @@ export function HabitsPage({
                           {h.emoji} {h.name}
                         </p>
                         <p className="mt-1 text-xs font-medium text-muted">
-                          {h.pct}% · {h.timesPerWeek}×/нед · {p.label}
+                          {h.intent==="reduce"?"Наблюдения":`${h.pct}% · ${h.timesPerWeek}×/нед · ${p.label}`}
                         </p>
                         {h.goalTitle && onOpenGoal && h.goalId && (
                           <button
@@ -290,11 +291,11 @@ export function HabitsPage({
                             🎯 {h.goalTitle}
                           </button>
                         )}
-                        <ProgressBar value={h.pct} className="mt-3" />
+                        {h.intent!=="reduce"&&<ProgressBar value={h.pct} className="mt-3" />}
                         {h.intent==="reduce"&&<ReductionPanel state={state} habit={h}/>}
                         <button className="min-h-11 text-xs font-bold text-brand" onClick={()=>{setEditing(h);setFormOpen(true)}}>Настроить привычку</button>
                         <div className="mt-2 flex flex-wrap gap-1">{Array.from({length:state.dayCount},(_,i)=>{const date=toDateKey(new Date(state.year,state.month,i+1));return <HabitCell key={date} habit={h} date={date} onClick={()=>setRecord({habit:h,date})}/>})}</div>
-                        <p className="mt-2 text-xs text-muted">{(()=>{const p=habitPeriod(h,toDateKey(new Date(state.year,state.month,1)),toDateKey(new Date(state.year,state.month+1,0)));return `Выполнено: ${p.done} · регулярность ${p.regularity}% · серия ${p.current} · лучшая ${p.best}`})()}</p>
+                        <p className="mt-2 text-xs text-muted">{(()=>{const p=habitPeriod(h,toDateKey(new Date(state.year,state.month,1)),toDateKey(new Date(state.year,state.month+1,0)));return `Выполнено: ${p.done} · регулярность ${p.regularity}% · серия ${p.current} ${p.unit} · лучшая ${p.best} ${p.unit}`})()}</p>
                       </div>
                     </div>
                   </li>
@@ -423,7 +424,7 @@ export function HabitsPage({
                       <td className="min-w-[130px] px-3 py-2">
                         {h.intent==="reduce"&&<ReductionPanel state={state} habit={h}/>}
                         <button className="min-h-11 text-xs text-brand" onClick={()=>{setEditing(h);setFormOpen(true)}}>Настроить</button>
-                        <p className="text-[10px] text-muted">{(()=>{const p=habitPeriod(h,toDateKey(new Date(state.year,state.month,1)),toDateKey(new Date(state.year,state.month+1,0)));return `Серия ${p.current} · лучшая ${p.best} · ${p.regularity}%`})()}</p>
+                        <p className="text-[10px] text-muted">{(()=>{const p=habitPeriod(h,toDateKey(new Date(state.year,state.month,1)),toDateKey(new Date(state.year,state.month+1,0)));return `Серия ${p.current} ${p.unit} · лучшая ${p.best} ${p.unit} · ${p.regularity}%`})()}</p>
                         <div className="text-[11px] font-bold text-muted">
                           {h.totalDone}/{h.targetDays} · {d.label}
                         </div>
@@ -503,6 +504,8 @@ export function HabitsPage({
       {record && record.habit.intent!=="reduce" && <HabitRecordEditor state={state} habit={record.habit} date={record.date} onClose={()=>setRecord(null)}/>}
       {record?.habit.intent==="reduce"&&<BottomSheet open onClose={()=>setRecord(null)} title={record.habit.name}><ReductionPanel state={state} habit={record.habit} date={record.date}/></BottomSheet>}
       <HabitFormModal
+        sphereNames={state.life.sphereNames}
+        directions={state.life.directions.map(d=>({id:d.id,name:d.versions.at(-1)?.name??d.id}))}
         habits={state.habitsAll}
         directionLocked={state.contracts.some(c=>c.habitId===editing?.id&&c.status==="active")}
         habit={editing}

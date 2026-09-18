@@ -1,6 +1,7 @@
 import { getSupabase, isCloudEnabled, type CloudProfile } from './supabase'
 
 const EMPTY = '{}'
+const serverVersions = new Map<string, string | null>()
 
 /** Локальный кэш зеркала облачного стора */
 export function localStoreKey(userId: string) {
@@ -20,6 +21,7 @@ export async function fetchCloudStore(userId: string): Promise<string | null> {
   if (error) {
     throw new Error('Не удалось загрузить облачные данные. Локальная копия сохранена; синхронизация приостановлена.')
   }
+  serverVersions.set(userId, data?.updated_at ?? null)
   if (!data) return null
   const payload = data.data
   if (!payload || (typeof payload === 'object' && Object.keys(payload as object).length === 0)) {
@@ -36,19 +38,19 @@ export async function pushCloudStore(userId: string, storeJson: string): Promise
   try {
     parsed = JSON.parse(storeJson || EMPTY)
   } catch {
-    parsed = {}
-  }
-
-  const { error } = await sb.from('user_stores').upsert({
-    user_id: userId,
-    data: parsed,
-    updated_at: new Date().toISOString(),
-  })
-
-  if (error) {
-    console.warn('[cloudStore] push failed', error.message)
     return false
   }
+
+  const version = serverVersions.get(userId)
+  if (version === undefined) return false // Must read before writing; never overwrite an unknown version.
+  const payload = { user_id: userId, data: parsed, updated_at: new Date().toISOString() }
+  const query = version === null
+    ? sb.from('user_stores').insert(payload).select('updated_at').maybeSingle()
+    : sb.from('user_stores').update(payload).eq('user_id', userId).eq('updated_at', version).select('updated_at').maybeSingle()
+  const { data, error } = await query
+  if (error || !data) return false
+  serverVersions.set(userId, data.updated_at)
+
   return true
 }
 

@@ -32,7 +32,7 @@ import {
   type UserQuestListing,
   USER,
 } from '../data/seed'
-import { getCurrentUserName, TESTER_USER_ID } from '../lib/auth'
+import { getCurrentUserName } from '../lib/auth'
 import {
   findQuestTemplate,
   habitDisplayCopy,
@@ -1119,7 +1119,7 @@ function loadStore(userId: string): Store {
     }
 
     const raw = localStorage.getItem(storageKey(userId))
-    if (raw && !JSON.parse(raw).life && !localStorage.getItem(`${storageKey(userId)}:before-life`)) localStorage.setItem(`${storageKey(userId)}:before-life`, raw)
+    if (raw && !localStorage.getItem(`${storageKey(userId)}:before-life`)) localStorage.setItem(`${storageKey(userId)}:before-life`, raw)
     if (raw) {
       const store = parseStore(raw)
       if (store) {
@@ -1232,6 +1232,8 @@ function buildGoalStats(goals: Goal[], habits: Habit[]): GoalStat[] {
   })
 }
 
+function dataDigest(s: Store) { return JSON.stringify({habits:s.habits,goals:s.goals,life:s.life,plannerTasks:s.plannerTasks,contracts:s.contracts,desktop:s.desktop}) }
+
 function energyPlanIds(s: Store) {
   const habits = s.habits.map(normalizeHabit)
   return [...new Set([
@@ -1259,6 +1261,13 @@ export function useLifeOS(userId: string | null) {
   }
   const life = useMemo(() => normalizeLife(store.life), [store.life])
   const updateLife = (update: (previous: LifeData) => LifeData) => setStore(s => ({...s, life: update(normalizeLife(s.life))}))
+  const [syncConflict, setSyncConflict] = useState<Store | null>(null)
+  const resolveSyncConflict = (source: 'local' | 'cloud') => {
+    if(!syncConflict || !userId)return
+    localStorage.setItem(`${storageKey(userId)}:before-sync-choice`, JSON.stringify(store))
+    if(source==='cloud'){setStore(syncConflict);localStorage.setItem(`${storageKey(userId)}:cloud-base`, dataDigest(syncConflict));skipNextCloudPush.current=true}
+    setSyncConflict(null);setSyncError(null);setCloudHydrated(true)
+  }
   const [syncError, setSyncError] = useState<string | null>(null)
   const [cloudHydrated, setCloudHydrated] = useState(() => !isCloudEnabled() || !userId)
   const skipNextCloudPush = useRef(false)
@@ -1279,14 +1288,24 @@ export function useLifeOS(userId: string | null) {
 
     const gen = ++hydrateGen.current
     setCloudHydrated(false)
+    setSyncConflict(null)
+    setSyncError(null)
+    const atStart = localStorage.getItem(storageKey(userId))
     ;(async () => {
       try {
-      await migrateLocalStoreIfNeeded(userId, [TESTER_USER_ID])
+      await migrateLocalStoreIfNeeded(userId)
       const remote = await fetchCloudStore(userId)
       if (hydrateGen.current !== gen) return
       if (remote) {
         const parsed = parseStore(remote)
         if (parsed) {
+          const latestRaw=localStorage.getItem(storageKey(userId))
+          const latest=latestRaw?parseStore(latestRaw):null
+          const baseline=localStorage.getItem(`${storageKey(userId)}:cloud-base`)
+          const localChanged=latest && ((baseline && baseline!==dataDigest(latest)) || (atStart && latestRaw!==atStart && dataDigest(parseStore(atStart)??latest)!==dataDigest(latest)))
+          if(localChanged && latest && dataDigest(latest)!==dataDigest(parsed)){setSyncConflict(parsed);setSyncError('На устройстве и в облаке есть разные изменения. Выбери, какую версию продолжить. Обе копии сохранены.');localStorage.setItem(`${storageKey(userId)}:cloud-conflict`,remote);return}
+          if(latestRaw)localStorage.setItem(`${storageKey(userId)}:before-cloud-load`,latestRaw)
+          localStorage.setItem(`${storageKey(userId)}:cloud-base`,dataDigest(parsed))
           skipNextCloudPush.current = true
           const withVisit = applyVisitReward(parsed)
           const settled = settleContracts(
@@ -1305,11 +1324,15 @@ export function useLifeOS(userId: string | null) {
   }, [userId])
 
   useEffect(() => {
+    let clockMonth = currentYearMonth()
     const sync = () => {
       setCurrentDay(todayKey())
       const { year, month } = currentYearMonth()
+      const previousClockMonth = clockMonth
+      clockMonth = {year,month}
       setStore((s) => {
-        if (s.year === year && s.month === month) return s
+        if (previousClockMonth.year === year && previousClockMonth.month === month) return s
+        if (s.year !== previousClockMonth.year || s.month !== previousClockMonth.month) return s
         return { ...s, year, month }
       })
     }
@@ -1327,7 +1350,7 @@ export function useLifeOS(userId: string | null) {
   useEffect(() => {
     // Не пишем чужой стор в ключ нового пользователя при смене аккаунта
     if (!userId || userId !== activeUserId) return
-    localStorage.setItem(storageKey(userId), JSON.stringify(store))
+    try { localStorage.setItem(storageKey(userId), JSON.stringify(store)) } catch { setSyncError('Не удалось сохранить на устройстве: проверь свободное место. Не закрывай страницу.'); return }
 
     if (!isCloudEnabled() || !cloudHydrated) return
     if (skipNextCloudPush.current) {
@@ -1336,7 +1359,7 @@ export function useLifeOS(userId: string | null) {
     }
     if (cloudTimer.current) window.clearTimeout(cloudTimer.current)
     cloudTimer.current = window.setTimeout(() => {
-      void pushCloudStore(userId, JSON.stringify(store)).then(ok => setSyncError(ok ? null : 'Изменения сохранены на устройстве. Облачная синхронизация не удалась.')).catch(() => setSyncError('Изменения сохранены на устройстве. Нет связи с облаком.'))
+      void pushCloudStore(userId, JSON.stringify(store)).then(ok => { if(ok)localStorage.setItem(`${storageKey(userId)}:cloud-base`,dataDigest(store));setSyncError(ok ? null : 'Изменения сохранены на устройстве. Облако недоступно или изменено с другого устройства. Повтори загрузку для сверки.') }).catch(() => setSyncError('Изменения сохранены на устройстве. Нет связи с облаком.'))
     }, 600)
     return () => {
       if (cloudTimer.current) window.clearTimeout(cloudTimer.current)
@@ -1400,12 +1423,12 @@ export function useLifeOS(userId: string | null) {
 
   const confirmReductionDay = (id:string,date:string,value:number) => {
     if(date>todayKey())return
-    setStore(s=>({...s,habits:s.habits.map(h=>h.id===id&&h.intent==='reduce'&&h.limit!==undefined?{...h,records:{...h.records,[date]:{value,target:h.records?.[date]?.target??h.limit,confirmed:true}}}:h)}))
+    setStore(s=>({...s,habits:s.habits.map(h=>h.id===id&&h.intent==='reduce'&&h.limit!==undefined?{...h,records:{...h.records,[date]:{value,target:h.records?.[date]?.target??h.limit,confirmed:true,intent:"reduce"}}}:h)}))
   }
   const recordHabitValue = (habitId: string, date: string, value: number | null, time?: string): {ok:boolean;reason?:string} => {
     const h=store.habits.find(h=>h.id===habitId)
-    if(!h || date>todayKey() || date<h.startDate || (value!==null&&(!Number.isFinite(value)||value<0))) return {ok:false,reason:'Проверь дату и значение'}
-    setStore(s=>{const habits=s.habits.map(h=>{if(h.id!==habitId)return h;const records={...h.records};const completions={...h.completions};if(value===null){delete records[date];delete completions[date]}else{const target=records[date]?.target??h.quantityTarget??1;records[date]={value,target,confirmed:true,at:time?new Date(`${date}T${time}`).toISOString():undefined};if(h.intent!=='reduce'&&value>=target)completions[date]=true;else delete completions[date]}return {...h,records,completions}});return {...s,habits,plannerTasks:syncTaskMarks(s.plannerTasks??[],habits,date,new Date().toISOString()),quests:syncQuests(habits,s.quests),streak:globalStreak(habits)}})
+    if(!h || h.intent==='reduce' || date>todayKey() || date<h.startDate || (value!==null&&(!Number.isFinite(value)||value<0))) return {ok:false,reason:'Проверь дату и значение'}
+    setStore(s=>{const habits=s.habits.map(h=>{if(h.id!==habitId)return h;const records={...h.records};const completions={...h.completions};if(value===null){delete records[date];delete completions[date]}else{const target=records[date]?.target??h.quantityTarget??1;records[date]={value,target,confirmed:true,intent:"develop",at:time?new Date(`${date}T${time}`).toISOString():undefined};if(h.intent!=='reduce'&&value>=target)completions[date]=true;else delete completions[date]}return {...h,records,completions}});return {...s,habits,plannerTasks:syncTaskMarks(s.plannerTasks??[],habits,date,new Date().toISOString()),quests:syncQuests(habits,s.quests),streak:globalStreak(habits)}})
     return {ok:true}
   }
 
@@ -2868,14 +2891,15 @@ export function useLifeOS(userId: string | null) {
   const todayTotal = todayDue.length
   const todayPct = todayTotal ? Math.round((todayDone / todayTotal) * 100) : 0
 
-  const monthDone = habitStats.reduce((a, h) => a + h.done, 0)
-  const monthTotal = Math.max(habitStats.length * dayCount, 1)
+  const developmentStats = habitStats.filter(h=>h.intent!=="reduce")
+  const monthDone = developmentStats.reduce((a, h) => a + h.done, 0)
+  const monthTotal = Math.max(developmentStats.length * dayCount, 1)
   const monthPct = habitStats.length
     ? Math.round((monthDone / monthTotal) * 1000) / 10
     : 0
 
   // Больше всего пропусков среди уже наступивших дней (без будущего)
-  const weakHabits = habitsAll
+  const weakHabits = habitsAll.filter(h=>h.intent!=="reduce")
     .map((h) => {
       const elapsed = elapsedStats(h)
       return {
@@ -2891,11 +2915,11 @@ export function useLifeOS(userId: string | null) {
     .slice(0, 3)
 
   const dailyProgress = Array.from({ length: dayCount }, (_, i) => {
-    const done = habitStats.filter((h) => h.days[i]).length
+    const done = developmentStats.filter((h) => h.days[i]).length
     return {
       day: i + 1,
       done,
-      pct: Math.round((done / Math.max(habitStats.length, 1)) * 100),
+      pct: Math.round((done / Math.max(developmentStats.length, 1)) * 100),
     }
   })
 
@@ -3908,25 +3932,12 @@ export function useLifeOS(userId: string | null) {
     setStore((s) => applyAchievementEventsToStore(s, list))
   }
 
-  const recordFocusSession = (input?: {
-    minutes?: number
-    uninterrupted?: boolean
-    taskId?: string
-    name?: string
-    habitId?: string
-  }) => {
-    const end = new Date()
-    const minutes = Math.max(1, Math.min(180, input?.minutes ?? store.focusSettings?.focusMinutes ?? 25))
-    const start = new Date(end.getTime() - minutes * 60_000)
-    const task = store.plannerTasks?.find(t => t.id === input?.taskId)
-    const habit = store.habits.find(h => h.id === (input?.habitId ?? task?.habitId))
-    updateLife(l => ({...l, events: [...l.events, {id: uid(), name: input?.name ?? task?.title ?? "Фокус", category: habit?.category ?? "focus", date: dateKey(start), start: start.toTimeString().slice(0,5), end: end.toTimeString().slice(0,5), endDate: dateKey(end), kind: "interval", source: "focus", sourceId: task?.id, habitId: habit?.id, goalId: habit?.goalId, sphere: habit?.sphere ?? "growth"}]}))
-    trackAchievementEvent({
-      type: 'focus_completed',
-      payload: {
-        minutes: input?.minutes ?? store.focusSettings?.focusMinutes ?? 25,
-        uninterrupted: input?.uninterrupted !== false,
-      },
+  const recordFocusSession = (input?: {minutes?:number;uninterrupted?:boolean;taskId?:string;name?:string;habitId?:string;sessionId?:string}) => {
+    const end=new Date(), amount=Math.max(1,Math.min(180,input?.minutes??store.focusSettings?.focusMinutes??25))
+    const start=new Date(end.getTime()-amount*60000), id=input?.sessionId??uid()
+    setStore(s=>{const life=normalizeLife(s.life);if(life.events.some(e=>e.id===id))return s
+      const task=s.plannerTasks?.find(t=>t.id===input?.taskId), habit=s.habits.find(h=>h.id===(input?.habitId??task?.habitId))
+      return applyAchievementEventsToStore({...s,life:{...life,events:[...life.events,{id,name:input?.name??task?.title??'Фокус',category:habit?.category??'focus',date:dateKey(start),start:start.toTimeString().slice(0,5),end:end.toTimeString().slice(0,5),endDate:dateKey(end),kind:'interval',source:'focus',sourceId:task?.id,habitId:habit?.id,goalId:habit?.goalId,sphere:habit?.sphere??'growth'}]}},[{type:'focus_completed',payload:{minutes:amount,uninterrupted:input?.uninterrupted!==false}}])
     })
   }
 
@@ -3986,7 +3997,7 @@ export function useLifeOS(userId: string | null) {
   }
 
   return {
-    life, updateLife, syncError, recordHabitValue, confirmReductionDay,
+    life, updateLife, syncError, syncConflict: !!syncConflict, resolveSyncConflict, recordHabitValue, confirmReductionDay,
     ...store,
     goals,
     habits: habitStats,

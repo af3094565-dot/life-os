@@ -1,3 +1,4 @@
+import { goalMinutes } from '../lib/life/selectors'
 import { useEffect, useRef, useState } from 'react'
 import {
   CheckCircle2,
@@ -213,6 +214,7 @@ export function GoalsPage({
               >
                 <GoalCard
                   goal={g}
+                  contributedMinutes={goalMinutes(state.life,g.id)}
                   delay={i * 60}
                   systemLocked={isLifeWheel}
                   onCheckIn={() => setCheckInGoalId(g.id)}
@@ -338,6 +340,7 @@ export function GoalsPage({
       />
 
       <HabitFormModal
+        sphereNames={state.life.sphereNames}
         open={!!habitFormGoalId}
         onClose={() => setHabitFormGoalId(null)}
         onSubmit={(input, addToMoodboard) =>
@@ -364,6 +367,7 @@ export function GoalsPage({
 function GoalCard({
   goal: g,
   delay,
+  contributedMinutes,
   systemLocked,
   onCheckIn,
   onToggleStage,
@@ -378,6 +382,7 @@ function GoalCard({
 }: {
   goal: GoalStat
   delay: number
+  contributedMinutes: number
   systemLocked?: boolean
   onCheckIn: () => void
   onToggleStage: (stageId: string) => void
@@ -401,6 +406,7 @@ function GoalCard({
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="text-base font-extrabold text-ink">{g.title}</h3>
+          {contributedMinutes>0&&<p className="mt-1 text-sm font-bold text-brand">Вклад времени: {Math.floor(contributedMinutes/60)} ч {Math.round(contributedMinutes%60)} мин</p>}
           <div className="mt-1 flex flex-wrap gap-1">
             <span
               className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${

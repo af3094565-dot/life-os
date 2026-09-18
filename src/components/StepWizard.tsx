@@ -92,6 +92,7 @@ export function StepWizard({
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
+      if((e.target as HTMLElement)?.matches('input,textarea,select'))return
       if (e.key === 'ArrowRight' && !isLast) goTo(step + 1)
       if (e.key === 'ArrowLeft' && !isFirst) goTo(step - 1)
     }

@@ -394,6 +394,7 @@ export function LifeMapPage({
       )}
 
       <HabitFormModal
+        sphereNames={state.life.sphereNames}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         onSubmit={(input, addToMoodboard) =>
@@ -411,6 +412,7 @@ export function LifeMapPage({
       />
 
       <HabitFormModal
+        sphereNames={state.life.sphereNames}
         open={!!editHabit}
         onClose={() => setEditHabitId(null)}
         habit={editHabit}
