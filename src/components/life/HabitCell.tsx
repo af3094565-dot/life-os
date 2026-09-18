@@ -11,11 +11,12 @@ export function HabitCell({
 }) {
   const { kind, ratio } = habitDay(habit, date);
   const labels = {
+    recorded: "День отмечен",
     outside: "Вне периода",
     unknown: "Нет данных",
-    missed: "Не выполнено",
+    missed: habit.intent === "reduce" ? "Выше ориентира" : "Не выполнено",
     partial: "Частично",
-    done: "Выполнено",
+    done: habit.intent === "reduce" ? "В пределах ориентира" : "Выполнено",
   };
   return (
     <button
@@ -33,7 +34,11 @@ export function HabitCell({
           : undefined
       }
     >
-      {kind === "done" ? "✓" : kind === "missed" ? "·" : ""}
+      {kind === "done"
+        ? "✓"
+        : kind === "missed" || kind === "recorded"
+          ? "·"
+          : ""}
     </button>
   );
 }

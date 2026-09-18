@@ -1,3 +1,4 @@
+import { reductionSummary } from "../../lib/life/patterns";
 import { useMemo, useState } from "react";
 import {
   Area,
@@ -159,6 +160,68 @@ export function LifeAnalytics({ state }: { state: LifeOSState }) {
         <p className="mt-4 life-muted">
           Для графика нужны записи хотя бы за два дня.
         </p>
+      )}
+      {habits.some((h) => h.intent === "reduce") && (
+        <section className="mt-5">
+          <h4 className="font-bold">Привычки, которые сокращаю</h4>
+          <p className="life-muted">
+            За {period} дней. День без записи не считается днём без эпизодов.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {habits
+              .filter((h) => h.intent === "reduce")
+              .map((h) => {
+                const summary = reductionSummary(state.life, h, today, period);
+                const confirmed = dates.filter(
+                  (d) =>
+                    h.records?.[d]?.confirmed &&
+                    h.records[d].intent === "reduce",
+                ).length;
+                return (
+                  <article
+                    key={h.id}
+                    className="min-w-0 rounded-xl bg-canvas p-3"
+                  >
+                    <p className="break-words text-sm font-bold">
+                      {h.emoji} {h.name}
+                    </p>
+                    <p className="mt-2 text-sm">
+                      Эпизодов: {summary.count} · дней с эпизодами:{" "}
+                      {summary.days}
+                    </p>
+                    <p className="life-muted">
+                      Подтверждено дней: {confirmed} / {period}
+                    </p>
+                    {summary.count > 0 && (
+                      <>
+                        <p className="life-muted">
+                          {summary.durationCount
+                            ? `Средний эпизод: ${summary.averageMinutes} мин · с длительностью: ${summary.durationCount}`
+                            : "Длительность не указана"}
+                          {summary.typical
+                            ? ` · время в записях: около ${summary.typical}`
+                            : ""}
+                        </p>
+                        <p className="life-muted">
+                          {summary.weekdays.join(" · ")}
+                        </p>
+                        {summary.contexts.length > 0 && (
+                          <p className="life-muted break-words">
+                            Контекст: {summary.contexts.join(", ")}
+                          </p>
+                        )}
+                      </>
+                    )}
+                    {h.alternative && (
+                      <p className="mt-2 text-xs text-muted">
+                        Вариант замены: {h.alternative}
+                      </p>
+                    )}
+                  </article>
+                );
+              })}
+          </div>
+        </section>
       )}
       {insights.length > 0 && (
         <section className="mt-5">

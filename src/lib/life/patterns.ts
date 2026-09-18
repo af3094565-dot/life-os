@@ -16,13 +16,21 @@ export function timeLabel(minute: number) {
   const n = (Math.round(minute) + 1440) % 1440;
   return `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
 }
-export function reductionSummary(life: LifeData, habit: Habit, end: string) {
+export function reductionSummary(
+  life: LifeData,
+  habit: Habit,
+  end: string,
+  period = 7,
+) {
   const events = life.events.filter(
     (e) =>
       e.habitId === habit.id &&
       !e.planned &&
-      e.date >= shiftDate(end, -6) &&
+      e.date >= shiftDate(end, 1 - period) &&
       e.date <= end,
+  );
+  const intervals = events.filter(
+    (e) => e.kind === "interval" && e.start && e.end,
   );
   const timed = events.filter((e) => e.start);
   const typical = timed.length
@@ -44,8 +52,11 @@ export function reductionSummary(life: LifeData, habit: Habit, end: string) {
     events,
     count: events.length,
     days: new Set(events.map((e) => e.date)).size,
-    averageMinutes: events.length
-      ? Math.round(events.reduce((s, e) => s + duration(e), 0) / events.length)
+    durationCount: intervals.length,
+    averageMinutes: intervals.length
+      ? Math.round(
+          intervals.reduce((s, e) => s + duration(e), 0) / intervals.length,
+        )
       : 0,
     typical,
     weekdays: [

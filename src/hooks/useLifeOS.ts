@@ -1,3 +1,5 @@
+import { duration, eventError } from '../lib/life/selectors'
+import type { LifeEvent } from '../lib/life/types'
 import { reconcileHabitRecords } from '../lib/life/habits'
 import type { HabitTracking } from '../lib/life/types'
 import { normalizeLife, syncLifeHistory, uid, dateKey } from '../lib/life/model'
@@ -1421,10 +1423,36 @@ export function useLifeOS(userId: string | null) {
     setMonth(year, month)
   }
 
-  const confirmReductionDay = (id:string,date:string,value:number) => {
-    if(date>todayKey())return
-    setStore(s=>({...s,habits:s.habits.map(h=>h.id===id&&h.intent==='reduce'&&h.limit!==undefined?{...h,records:{...h.records,[date]:{value,target:h.records?.[date]?.target??h.limit,confirmed:true,intent:"reduce"}}}:h)}))
+  const confirmReductionDay = (id: string, date: string, events: LifeEvent[]): {ok: boolean; reason?: string} => {
+    const habit = store.habits.find(h => h.id === id)
+    if (!habit || habit.intent !== 'reduce' || date > todayKey() || date < habit.startDate) {
+      return {ok: false, reason: 'Проверь дату и привычку'}
+    }
+    for (const event of events) {
+      const reason = eventError(event, todayKey())
+      if (event.habitId !== id || event.date !== date || event.planned || reason) {
+        return {ok: false, reason: reason ?? 'Проверь записи дня'}
+      }
+    }
+    setStore(s => {
+      const life = normalizeLife(s.life)
+      return {
+        ...s,
+        life: {...life, events: [...life.events.filter(e => e.habitId !== id || e.date !== date || e.planned), ...events]},
+        habits: s.habits.map(h => h.id === id ? {
+          ...h,
+          records: {...h.records, [date]: {
+            value: h.unit === 'мин' ? events.reduce((sum, e) => sum + duration(e), 0) : events.length,
+            target: h.records?.[date]?.target ?? h.limit ?? 0,
+            confirmed: true,
+            intent: 'reduce',
+          }},
+        } : h),
+      }
+    })
+    return {ok: true}
   }
+
   const recordHabitValue = (habitId: string, date: string, value: number | null, time?: string): {ok:boolean;reason?:string} => {
     const h=store.habits.find(h=>h.id===habitId)
     if(!h || h.intent==='reduce' || date>todayKey() || date<h.startDate || (value!==null&&(!Number.isFinite(value)||value<0))) return {ok:false,reason:'Проверь дату и значение'}

@@ -496,3 +496,5 @@ select {
 .habit-cell.outside { opacity: .25; }
 .habit-cell.unknown { border-style: dashed; }
 .habit-cell:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+
+.habit-cell.recorded { background: var(--color-brand-soft); color: var(--color-brand); border-color: var(--color-brand); }

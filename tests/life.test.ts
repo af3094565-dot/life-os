@@ -268,3 +268,58 @@ test("linked instances share one direction without generating repeated history v
     next.life?.directions[0].versions.length,
   );
 });
+
+test("reduction without a limit records observation without judging success", () => {
+  const h = {
+    ...habit,
+    intent: "reduce" as const,
+    completions: {},
+    records: {
+      "2024-01-01": {
+        intent: "reduce" as const,
+        confirmed: true,
+        value: 0,
+        target: 0,
+      },
+    },
+  };
+  assert.equal(habitDay(h, "2024-01-01").kind, "recorded");
+  assert.equal(habitDay(h, "2024-01-02").kind, "unknown");
+  assert.equal(habitDay({ ...h, limit: 0 }, "2024-01-01").kind, "done");
+});
+import { reductionSummary } from "../src/lib/life/patterns.ts";
+test("reduction statistics respect selected period and ignore planned episodes", () => {
+  const life = emptyLife();
+  life.events = [
+    {
+      id: "a",
+      name: "Phone",
+      habitId: "h",
+      category: "phone",
+      source: "manual",
+      kind: "point",
+      date: "2024-01-01",
+    },
+    {
+      id: "b",
+      name: "Phone",
+      habitId: "h",
+      category: "phone",
+      source: "manual",
+      kind: "point",
+      date: "2024-01-28",
+    },
+    {
+      id: "c",
+      name: "Phone",
+      habitId: "h",
+      category: "phone",
+      source: "manual",
+      kind: "point",
+      date: "2024-01-28",
+      planned: true,
+    },
+  ];
+  assert.equal(reductionSummary(life, habit, "2024-01-28", 7).count, 1);
+  assert.equal(reductionSummary(life, habit, "2024-01-28", 28).count, 2);
+});

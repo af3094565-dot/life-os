@@ -111,7 +111,7 @@ export function ProgressPage({ state, userName, onNavigate }: Props) {
       />
       </div>
 
-      {(state.life.events.length>0||state.life.marks.length>0||Object.keys(state.life.days).length>0||state.habitsAll.some(h=>Object.keys(h.completions).length>0))&&<LifeAnalytics state={state} />}
+      {(state.life.events.length>0||state.life.marks.length>0||Object.keys(state.life.days).length>0||state.habitsAll.some(h=>h.intent==="reduce"||Object.keys(h.completions).length>0))&&<LifeAnalytics state={state} />}
       <PatternPanel state={state} />
 
       <Card className="mb-5 hidden animate-fade-up md:block">

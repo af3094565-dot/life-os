@@ -5,6 +5,12 @@ export function habitDay(h: Habit, date: string, today = dateKey()) {
     return { kind: "outside", ratio: 0 } as const;
   const r = h.records?.[date];
   if (r) {
+    if (
+      (r.intent ?? h.intent) === "reduce" &&
+      r.confirmed &&
+      h.limit === undefined
+    )
+      return { kind: "recorded", ratio: 0 } as const;
     const ratio =
       (r.intent ?? h.intent) === "reduce"
         ? r.confirmed && h.limit !== undefined
