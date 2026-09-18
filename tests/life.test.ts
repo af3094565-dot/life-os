@@ -41,3 +41,15 @@ test('partial amounts do not complete and legacy targets survive changes',()=>{
  assert.equal(next.habits[0].records?.['2024-01-01'].target,30)
  assert.equal(next.habits[0].records?.['2024-01-01'].at,undefined)
 })
+import { choiceCandidates, dayPatterns, circularDistance } from '../src/lib/life/patterns.ts'
+test('reduction is unknown without confirmation; zero limit is supported',()=>{
+ const h={...habit,intent:'reduce' as const,limit:0,completions:{},records:{'2024-01-01':{value:0,target:0,confirmed:true}}}
+ assert.equal(habitDay(h,'2024-01-01').kind,'done');assert.equal(habitDay(h,'2024-01-02').kind,'unknown')
+})
+test('choice detection requires history and handles midnight',()=>{
+ assert.equal(circularDistance(1430,10),20)
+ const l=emptyLife();const h={...habit,intent:'reduce' as const,alternative:'Read'}
+ const make=(i:number)=>({id:String(i),date:`2026-09-${String(i+10).padStart(2,'0')}`,name:'Phone',category:'phone',start:i%2?'23:50':'00:10',kind:'point' as const,source:'manual' as const,habitId:'h'})
+ l.events=[make(0)];assert.equal(choiceCandidates(l,[h],'2026-09-18').length,0)
+ l.events=Array.from({length:5},(_,i)=>make(i));assert.equal(choiceCandidates(l,[h],'2026-09-18').length,1)
+})
