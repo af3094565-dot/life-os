@@ -1,3 +1,5 @@
+import { DayState } from '../components/life/DayState'
+import { calendarMetric, type CalendarMetric } from '../lib/life/metrics'
 import { DayHistory } from '../components/life/DayHistory'
 import { TrackingSettings } from '../components/life/TrackingSettings'
 import { useMemo, useState } from 'react'
@@ -16,6 +18,7 @@ type CalendarItem =
 type Props = { state: LifeOSState; userName: string; onNavigate: (page: PageId) => void }
 
 export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
+  const [metric, setMetric] = useState<CalendarMetric>("rating")
   const [trackingOpen, setTrackingOpen] = useState(false)
   const [view, setView] = useState<'day' | 'week' | 'month'>('month')
   const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()))
@@ -175,6 +178,7 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
         </div>
       </div>
 
+      {view === 'month' && <label className="life-form mb-3 block max-w-xs text-sm">Цвет календаря<select value={metric} onChange={e=>setMetric(e.target.value as CalendarMetric)}>{[["rating","Моя оценка"],["analysis","Анализ дня"],["mood","Настроение"],["felt-energy","Энергия по ощущениям"],["sleep","Сон"],["habits","Привычки"]].map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>}
       {view === 'month' && (
         <div className="grid gap-5 xl:grid-cols-[1.4fr_0.8fr]">
           <Card className="animate-fade-up">
@@ -213,9 +217,11 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
               const key = toDateKey(date)
               const items = itemsByDate.get(key) ?? []
               const active = selectedDate === key
+              const metricValue = calendarMetric(state.life, state.habitsAll, key, metric)
               return (
                 <div
                   key={key}
+                  style={metricValue===undefined?undefined:{backgroundColor:`rgba(123,63,228,${0.05 + Math.min(1,metricValue/(metric==="habits"||metric==="analysis"?100:10))*.25})`}}
                   role="button" tabIndex={0} aria-label={`Открыть день ${key}`}
                   onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedDate(key); setView("day") } }}
                   onClick={() => {
@@ -249,6 +255,7 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
                     <span className="text-sm font-extrabold text-ink">{date.getDate()}</span>
                     <span className="text-[10px] font-bold text-muted">{items.length}</span>
                   </div>
+                  <p className="mt-1 text-xs font-bold text-brand">{metricValue===undefined?"—":`${Math.round(metricValue*10)/10}${metric==="sleep"?" ч":metric==="analysis"||metric==="habits"?"%":"/10"}`}</p>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {items.slice(0, 6).map((item) => (
                       <button
@@ -437,6 +444,7 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
         </div>
       )}
 
+      {view === 'day' && <DayState state={state} date={selectedDate} />}
       {view === 'day' && <DayHistory state={state} date={selectedDate} />}
       {view === 'day' && (
         <Card className="animate-fade-up">
@@ -598,6 +606,7 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
                     </div>
                     <div className="text-lg font-extrabold text-ink">{date.getDate()}</div>
                   </button>
+                  <div className="mb-3 space-y-1 text-xs text-muted">{([['mood','Настроение'],['sleep','Сон'],['felt-energy','Энергия'],['habits','Привычки'],['rating','Моя оценка']] as const).map(([m,label])=>{const value=calendarMetric(state.life,state.habitsAll,key,m);return <p key={m}>{label}: {value===undefined?'—':Math.round(value*10)/10}</p>})}<p>Сокращаю: {state.life.events.filter(e=>e.date===key&&state.habitsAll.some(h=>h.id===e.habitId&&h.intent==='reduce')).length} записей</p></div>
                   <div className="space-y-2">
                     {items.length === 0 && (
                       <div className="rounded-xl bg-surface px-2 py-2 text-xs font-medium text-muted">

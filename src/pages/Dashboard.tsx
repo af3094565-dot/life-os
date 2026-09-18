@@ -1,3 +1,5 @@
+import { DayState } from '../components/life/DayState'
+import { dateKey } from '../lib/life/model'
 import { useEffect, useId, useState } from 'react'
 import {
   Bell,
@@ -196,6 +198,7 @@ export function Dashboard({
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}
       />
+      <DayState state={state} date={dateKey()} />
 
 
       <DashboardOverview state={state} done={doneCount} total={totalCount} goals={activeGoals.length}

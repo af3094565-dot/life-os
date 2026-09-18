@@ -23,3 +23,13 @@ test('task and its habit become one event; old marks get no invented time',()=>{
  const events=dayEvents(emptyLife(),[habit],[{id:'t',title:'Task',habitId:'h',scheduledFor:'2024-01-01',completedAt:'2026-01-01T12:00:00'}],'2024-01-01')
  assert.equal(events.length,1);assert.equal(events[0].start,undefined)
 })
+import { dayAnalysis, indicatorValue } from '../src/lib/life/metrics.ts'
+test('unknown data does not count as failure and historical target remains fixed',()=>{
+ const l=emptyLife();l.indicators=l.indicators.map(i=>({...i,enabled:i.id==='water'||i.id==='sleep',target:10}));l.marks=[{id:'m',indicatorId:'water',date:'2024-01-01',value:5,target:5,importance:'foundation'}]
+ assert.equal(dayAnalysis(l,'2024-01-01').score,100);assert.equal(dayAnalysis(l,'2024-01-01').known,1);assert.equal(dayAnalysis(l,'2024-01-02').score,undefined)
+ l.marks[0].value=0;assert.equal(dayAnalysis(l,'2024-01-01').score,0)
+})
+test('sleep belongs to wake date',()=>{
+ const l=emptyLife();l.events=[{id:'s',name:'Сон',category:'sleep',date:'2026-09-16',start:'23:00',end:'07:00',endDate:'2026-09-17',kind:'interval',source:'manual'}]
+ assert.equal(indicatorValue(l,'sleep','2026-09-17')?.value,8);assert.equal(indicatorValue(l,'sleep','2026-09-16'),undefined)
+})
