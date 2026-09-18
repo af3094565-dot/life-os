@@ -40,14 +40,23 @@ export function buildWorldSnapshot(s: AchievementStoreSlice): AchievementWorldSn
     tasks.map((t) => t.scheduledFor).filter(Boolean) as string[],
   ).size
 
+  const entries = habits.flatMap(h => Object.entries(h.completions ?? {}).filter(([, done]) => done).map(([day]) => `${h.id}/${day}`))
+  const taskHabits = new Map((s.plannerTasks ?? []).map(t => [t.id, (t as { habitId?: string }).habitId]))
+  const actionKeys = new Set(entries)
+  for (const task of tasks) if (task.completedAt) actionKeys.add(`${taskHabits.get(task.id) ?? task.id}/${task.scheduledFor ?? task.completedAt.slice(0, 10)}`)
+  const dates = [...new Set([...actionKeys].map(key => key.slice(key.lastIndexOf('/') + 1)))].sort()
+  const comeback = dates.some((day, index) => index > 0 && (Date.parse(day) - Date.parse(dates[index - 1])) / 86400000 >= 7)
   return {
+    actionsDone: actionKeys.size,
+    activeDays: dates.length,
+    comebackDone: comeback,
     habitCount: habits.length,
     activeHabitCount: habits.length,
     habitCompletionsTotal,
     habitStreak: s.streak ?? 0,
     goalCount: goals.filter((g) => !g.fromLifeMap || g.id.startsWith('life-')).length,
     activeGoalCount: goals.filter((g) => g.status === 'active').length,
-    goalsCompleted: goals.filter((g) => g.status === 'done').length,
+    goalsCompleted: goals.filter((g) => g.status === 'done' && !g.fromLifeMap).length,
     questsAccepted: contracts.length,
     questsWon: contracts.filter((c) => c.status === 'won').length,
     taskCount: tasks.length,
@@ -65,7 +74,6 @@ export function applyAchievementEventsToStore<T extends AchievementStoreSlice>(
   store: T,
   events: AchievementEvent[],
 ): T {
-  if (!events.length) return store
   const prev = normalizeAchievementState(store.achievements)
   const snap = buildWorldSnapshot(store)
   const result = processAchievementEvents(prev, events, snap)

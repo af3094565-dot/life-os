@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { Check, Copy, Share2, X } from 'lucide-react'
 import type { UserQuestListing } from '../data/seed'
-import { DIAMOND, formatDiamonds, questCreatorCut } from '../lib/economy'
+import { formatDiamonds } from '../lib/economy'
 import { buildShareUrl } from '../lib/userQuestShare'
 
 type Props = {
@@ -27,7 +27,6 @@ export function ShareUserQuestModal({ listing, open, onClose }: Props) {
   if (!open || !listing) return null
 
   const url = buildShareUrl(listing)
-  const cut = questCreatorCut(listing.price)
 
   const copy = async () => {
     try {
@@ -39,7 +38,7 @@ export function ShareUserQuestModal({ listing, open, onClose }: Props) {
   }
 
   const share = async () => {
-    const text = `${listing.emoji} ${listing.title}\nЦена ${formatDiamonds(listing.price)} · награда ${formatDiamonds(listing.reward)}`
+    const text = `${listing.emoji} ${listing.title}\nЦена ${formatDiamonds(listing.price)} · энергия за ежедневные действия`
     try {
       if (navigator.share) {
         await navigator.share({ title: listing.title, text, url })
@@ -84,20 +83,7 @@ export function ShareUserQuestModal({ listing, open, onClose }: Props) {
         </div>
 
         <p className="text-sm font-medium leading-relaxed text-muted">
-          {listing.isMine ? (
-            <>
-              Отправь ссылку друзьям. Когда они купят квест, ты получишь{' '}
-              <span className="font-extrabold text-ink">
-                {DIAMOND} {formatDiamonds(cut)}
-              </span>{' '}
-              с каждой продажи (50%).
-            </>
-          ) : (
-            <>
-              Отправь ссылку — друг сможет принять этот квест. Автор «{listing.authorName}»
-              получит {DIAMOND} {formatDiamonds(cut)} с продажи.
-            </>
-          )}
+          Отправь ссылку друзьям, чтобы пройти испытание вместе. Энергия за пересылку квеста не начисляется.
         </p>
 
         <div className="mt-4 break-all rounded-xl bg-canvas px-3 py-3 text-xs font-medium text-muted ring-1 ring-line">

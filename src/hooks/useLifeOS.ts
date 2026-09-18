@@ -1,4 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { applyEnergyTransition, migrateEnergy, type EnergyLedger } from '../lib/energy'
+import { dayCharge } from '../lib/dayCharge'
+import { todayOverview } from '../lib/todayOverview'
+import { syncTaskMarks } from '../lib/todayOverview'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  fetchCloudStore,
+  migrateLocalStoreIfNeeded,
+  pushCloudStore,
+} from '../lib/cloudStore'
+import { isCloudEnabled } from '../lib/supabase'
 import {
   currentYearMonth,
   seedGoals,
@@ -18,7 +28,7 @@ import {
   type UserQuestListing,
   USER,
 } from '../data/seed'
-import { getCurrentUserName } from '../lib/auth'
+import { getCurrentUserName, TESTER_USER_ID } from '../lib/auth'
 import {
   findQuestTemplate,
   habitDisplayCopy,
@@ -37,13 +47,13 @@ import {
 import {
   ECONOMY,
   canAfford,
+  canAffordHabit,
   formatDiamonds,
   makeDiamondTx,
   pushDiamondTx,
   type DiamondTx,
 } from '../lib/economy'
 import {
-  makeSaleClaim,
   makeShareCode,
   sharedPayloadToListing,
   type SaleClaimPayload,
@@ -323,6 +333,7 @@ export type GoalStat = Goal & {
 }
 
 type Store = {
+  energy?: EnergyLedger
   year: number
   month: number
   habits: Habit[]
@@ -335,7 +346,7 @@ type Store = {
   /** Уже полученные чеки продаж (чтобы не зачислить дважды) */
   claimedSaleIds: string[]
   streak: number
-  /** Алмазы */
+  /** Энергия */
   diamonds: number
   /** История начислений и списаний */
   diamondHistory: DiamondTx[]
@@ -873,7 +884,7 @@ function normalizeContract(c: QuestContract): QuestContract {
     ...c,
     listItems: c.listItems ?? [],
     status: c.status ?? 'active',
-    reward: c.reward ?? c.cost * 2,
+    reward: 0,
     habitTitle,
     habitTagline,
     reminderTime: c.reminderTime,
@@ -896,6 +907,7 @@ function syncHabitWithContract(h: Habit, contracts: QuestContract[]): Habit {
 function normalizeUserListing(l: UserQuestListing): UserQuestListing {
   return {
     ...l,
+    reward: 0,
     salesCount: l.salesCount ?? 0,
     earnedDiamonds: l.earnedDiamonds ?? 0,
     isMine: l.isMine ?? false,
@@ -923,7 +935,7 @@ function freshStore(): Store {
       makeDiamondTx({
         amount: diamonds,
         reason: 'start',
-        label: 'Приветственные алмазы за регистрацию',
+        label: 'Стартовая энергия за регистрацию',
         balanceAfter: diamonds,
       }),
     ],
@@ -1110,7 +1122,7 @@ function loadStore(userId: string): Store {
           withVisit.diamonds,
           withVisit.diamondHistory,
         )
-        return { ...withVisit, ...settled }
+        return { ...withVisit, ...settled, diamonds: store.diamonds, diamondHistory: store.diamondHistory }
       }
     }
   } catch {
@@ -1212,21 +1224,75 @@ function buildGoalStats(goals: Goal[], habits: Habit[]): GoalStat[] {
   })
 }
 
+function energyPlanIds(s: Store) {
+  const habits = s.habits.map(normalizeHabit)
+  return [...new Set([
+    ...syncQuests(habits, s.quests).flatMap(q => q.habitId ? [q.habitId] : []),
+    ...(s.plannerTasks ?? []).filter(t => t.scheduledFor === todayKey()).map(t => t.habitId),
+  ])]
+}
+
 export function useLifeOS(userId: string | null) {
   const [activeUserId, setActiveUserId] = useState(userId)
-  const [store, setStore] = useState<Store>(() =>
-    userId ? loadStore(userId) : freshStore(),
+  const [currentDay, setCurrentDay] = useState(todayKey)
+  const [store, setRawStore] = useState<Store>(() =>
+    (() => { const initial = userId ? loadStore(userId) : freshStore(); return migrateEnergy(initial, new Date(), energyPlanIds(initial)) })(),
   )
+  const setStore = (update: Store | ((previous: Store) => Store)) => {
+    setRawStore(previous => typeof update === 'function'
+      ? (() => {
+          const now = new Date()
+          const base = migrateEnergy(previous, now, energyPlanIds(previous))
+          const proposed = update(base)
+          const next = applyEnergyTransition(base, proposed, now, energyPlanIds(proposed))
+          return next === previous ? previous : applyAchievementEventsToStore(next, [])
+        })()
+      : migrateEnergy(update, new Date(), energyPlanIds(update)))
+  }
+  const [cloudHydrated, setCloudHydrated] = useState(() => !isCloudEnabled() || !userId)
+  const skipNextCloudPush = useRef(false)
+  const cloudTimer = useRef<number | null>(null)
+  const hydrateGen = useRef(0)
 
-  // Смена аккаунта → своё чистое (или сохранённое) хранилище
+
+
+  // Смена аккаунта → локальный стор, затем облако
   useEffect(() => {
-    if (userId === activeUserId) return
     setActiveUserId(userId)
     setStore(userId ? loadStore(userId) : freshStore())
-  }, [userId, activeUserId])
+
+    if (!userId || !isCloudEnabled()) {
+      setCloudHydrated(true)
+      return
+    }
+
+    const gen = ++hydrateGen.current
+    setCloudHydrated(false)
+    ;(async () => {
+      await migrateLocalStoreIfNeeded(userId, [TESTER_USER_ID])
+      const remote = await fetchCloudStore(userId)
+      if (hydrateGen.current !== gen) return
+      if (remote) {
+        const parsed = parseStore(remote)
+        if (parsed) {
+          skipNextCloudPush.current = true
+          const withVisit = applyVisitReward(parsed)
+          const settled = settleContracts(
+            withVisit.habits.map(normalizeHabit),
+            withVisit.contracts.map(normalizeContract),
+            withVisit.diamonds,
+            withVisit.diamondHistory,
+          )
+          setStore({ ...withVisit, ...settled, diamonds: parsed.diamonds, diamondHistory: parsed.diamondHistory })
+        }
+      }
+      setCloudHydrated(true)
+    })()
+  }, [userId])
 
   useEffect(() => {
     const sync = () => {
+      setCurrentDay(todayKey())
       const { year, month } = currentYearMonth()
       setStore((s) => {
         if (s.year === year && s.month === month) return s
@@ -1235,14 +1301,33 @@ export function useLifeOS(userId: string | null) {
     }
     sync()
     const id = window.setInterval(sync, 60_000)
-    return () => window.clearInterval(id)
+    window.addEventListener('focus', sync)
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      window.clearInterval(id)
+      window.removeEventListener('focus', sync)
+      document.removeEventListener('visibilitychange', sync)
+    }
   }, [])
 
   useEffect(() => {
     // Не пишем чужой стор в ключ нового пользователя при смене аккаунта
     if (!userId || userId !== activeUserId) return
     localStorage.setItem(storageKey(userId), JSON.stringify(store))
-  }, [store, userId, activeUserId])
+
+    if (!isCloudEnabled() || !cloudHydrated) return
+    if (skipNextCloudPush.current) {
+      skipNextCloudPush.current = false
+      return
+    }
+    if (cloudTimer.current) window.clearTimeout(cloudTimer.current)
+    cloudTimer.current = window.setTimeout(() => {
+      void pushCloudStore(userId, JSON.stringify(store))
+    }, 600)
+    return () => {
+      if (cloudTimer.current) window.clearTimeout(cloudTimer.current)
+    }
+  }, [store, userId, activeUserId, cloudHydrated])
 
   // Чиним системные цели карты жизни только если карта уже создана
   useEffect(() => {
@@ -1412,6 +1497,7 @@ export function useLifeOS(userId: string | null) {
         ...s,
         habits,
         quests,
+        plannerTasks: syncTaskMarks(s.plannerTasks ?? [], habits, key, new Date().toISOString()),
         contracts: settled.contracts,
         streak: globalStreak(habits),
         diamonds: settled.diamonds,
@@ -1426,7 +1512,7 @@ export function useLifeOS(userId: string | null) {
   const toggleQuest = (questId: string) => {
     const today = todayKey()
     setStore((s) => {
-      const quest = s.quests.find((q) => q.id === questId)
+      const quest = syncQuests(s.habits.map(normalizeHabit), s.quests).find((q) => q.id === questId)
       if (!quest?.habitId) return s
       const wasMarked = !!s.habits
         .map(normalizeHabit)
@@ -1480,6 +1566,7 @@ export function useLifeOS(userId: string | null) {
         ...s,
         habits,
         quests,
+        plannerTasks: syncTaskMarks(s.plannerTasks ?? [], habits, today, new Date().toISOString()),
         contracts: settled.contracts,
         streak: globalStreak(habits),
         diamonds: settled.diamonds,
@@ -1495,7 +1582,7 @@ export function useLifeOS(userId: string | null) {
       : input.fromLifeMap
         ? ECONOMY.LIFE_MAP_HABIT_COST
         : ECONOMY.HABIT_COST
-    if (!free && !canAfford(store.diamonds, cost)) {
+    if (!free && !canAffordHabit(store.diamonds, cost)) {
       return {
         ok: false,
         reason: `Нужно ${formatDiamonds(cost)}. Сейчас ${formatDiamonds(store.diamonds)}. Отмечай дни (+${formatDiamonds(ECONOMY.DAY_REWARD)}), войди в ритм — потом добавляй новые привычки.`,
@@ -1525,7 +1612,7 @@ export function useLifeOS(userId: string | null) {
     }
     const id = `h-${Date.now()}-${Math.round(Math.random() * 1e6)}`
     setStore((s) => {
-      if (!free && !canAfford(s.diamonds, cost)) return s
+      if (!free && !canAffordHabit(s.diamonds, cost)) return s
       const areaId =
         input.lifeArea ||
         (input.goalId ? parseLifeMapGoalArea(input.goalId) : undefined) ||
@@ -1839,6 +1926,7 @@ export function useLifeOS(userId: string | null) {
         ...s,
         habits,
         quests,
+        plannerTasks: syncTaskMarks(s.plannerTasks ?? [], habits, yesterday, new Date().toISOString()),
         contracts: settled.contracts,
         diamonds: settled.diamonds,
         diamondHistory: settled.diamondHistory,
@@ -1916,7 +2004,7 @@ export function useLifeOS(userId: string | null) {
     if (!title) return { ok: false, reason: 'Укажи название квеста' }
     if (!description) return { ok: false, reason: 'Добавь короткое описание' }
     const price = Math.round(input.price)
-    const reward = Math.round(input.reward)
+    const reward = 0
     if (
       !Number.isFinite(price) ||
       price < ECONOMY.USER_QUEST_PRICE_MIN ||
@@ -1924,11 +2012,8 @@ export function useLifeOS(userId: string | null) {
     ) {
       return {
         ok: false,
-        reason: `Цена: от ${ECONOMY.USER_QUEST_PRICE_MIN} до ${ECONOMY.USER_QUEST_PRICE_MAX} алмазов`,
+        reason: `Цена: от ${ECONOMY.USER_QUEST_PRICE_MIN} до ${ECONOMY.USER_QUEST_PRICE_MAX} энергии`,
       }
-    }
-    if (!Number.isFinite(reward) || reward < price) {
-      return { ok: false, reason: 'Вознаграждение не меньше цены' }
     }
     if (input.target < 1 || input.durationDays < 1) {
       return { ok: false, reason: 'Укажи срок и цель' }
@@ -2012,16 +2097,6 @@ export function useLifeOS(userId: string | null) {
       return { ok: false, reason: 'Этот контракт уже активен' }
     }
 
-    const saleClaim =
-      !listing.isMine
-        ? makeSaleClaim({
-            shareCode: listing.shareCode,
-            title: listing.title,
-            price: listing.price,
-            buyerName: getCurrentUserName(USER.name),
-          })
-        : undefined
-
     const copy = userListingHabitCopy(listing)
 
     setStore((s) => {
@@ -2079,55 +2154,14 @@ export function useLifeOS(userId: string | null) {
       )
     })
 
-    return { ok: true, saleClaim }
+    return { ok: true }
   }
 
   const claimQuestSale = (
     payload: SaleClaimPayload,
   ): { ok: boolean; reason?: string; cut?: number } => {
-    const cut = Math.max(0, Math.round(payload.cut))
-    if (!cut) return { ok: false, reason: 'Пустой чек продажи' }
-    if ((store.claimedSaleIds ?? []).includes(payload.claimId)) {
-      return { ok: false, reason: 'Эта продажа уже зачислена' }
-    }
-    const mine = (store.userListings ?? []).some(
-      (l) => l.isMine && l.shareCode === payload.shareCode,
-    )
-    if (!mine) {
-      return {
-        ok: false,
-        reason: 'Чек не для твоих квестов. Открой ссылку на устройстве автора.',
-      }
-    }
-
-    setStore((s) => {
-      if ((s.claimedSaleIds ?? []).includes(payload.claimId)) return s
-      const diamonds = s.diamonds + cut
-      return {
-        ...s,
-        diamonds,
-        claimedSaleIds: [...(s.claimedSaleIds ?? []), payload.claimId],
-        userListings: (s.userListings ?? []).map(normalizeUserListing).map((l) =>
-          l.isMine && l.shareCode === payload.shareCode
-            ? {
-                ...l,
-                salesCount: l.salesCount + 1,
-                earnedDiamonds: l.earnedDiamonds + cut,
-              }
-            : l,
-        ),
-        diamondHistory: pushDiamondTx(
-          s.diamondHistory,
-          makeDiamondTx({
-            amount: cut,
-            reason: 'quest_creator_sale',
-            label: `Продажа · ${payload.title} (${payload.buyerName})`,
-            balanceAfter: diamonds,
-          }),
-        ),
-      }
-    })
-    return { ok: true, cut }
+    void payload
+    return { ok: false, reason: 'Энергия — личный ресурс. Пересылка и продажа квестов не начисляют энергию.' }
   }
 
   const deleteUserQuest = (listingId: string) => {
@@ -2187,7 +2221,7 @@ export function useLifeOS(userId: string | null) {
     if (!canAfford(store.diamonds, ECONOMY.GOAL_COST)) {
       return {
         ok: false,
-        reason: `Нужно ${formatDiamonds(ECONOMY.GOAL_COST)}. Сейчас ${formatDiamonds(store.diamonds)}. Не ставь слишком много целей сразу — сначала ритм и алмазы.`,
+        reason: `Нужно ${formatDiamonds(ECONOMY.GOAL_COST)}. Сейчас ${formatDiamonds(store.diamonds)}. Не ставь слишком много целей сразу — сначала ритм и энергия.`,
       }
     }
     const goalId = `g-${Date.now()}`
@@ -2838,7 +2872,7 @@ export function useLifeOS(userId: string | null) {
 
   const quests = useMemo(
     () => syncQuests(habitsAll, store.quests),
-    [habitsAll, store.quests],
+    [habitsAll, store.quests, currentDay],
   )
 
   const nextQuest = quests.find((q) => !q.done) ?? quests[0]
@@ -2938,10 +2972,13 @@ export function useLifeOS(userId: string | null) {
   const todayPlannerTasks = useMemo(
     () =>
       plannerTasksDetailed
-        .filter((task) => task.scheduledFor === todayKey())
+        .filter((task) => task.scheduledFor === currentDay)
         .sort((a, b) => Number(!!a.completedAt) - Number(!!b.completedAt)),
-    [plannerTasksDetailed],
+    [plannerTasksDetailed, currentDay],
   )
+
+  const dailyOverview = todayOverview(quests, todayPlannerTasks)
+  const dailyCharge = dayCharge(dailyOverview.done, dailyOverview.total, store.diamonds)
 
   const todayFocusBlocks = useMemo(
     () =>
@@ -3829,7 +3866,7 @@ export function useLifeOS(userId: string | null) {
   // ——— Achievements API ———
   useEffect(() => {
     setStore((s) => {
-      if (s.achievements?.meta?.backfilled) return s
+      if (s.achievements?.collectionVersion === 2 && s.achievements?.meta?.backfilled) return s
       return ensureAchievementsBackfilled({
         ...s,
         achievements: s.achievements ?? emptyAchievements(),
@@ -3934,6 +3971,7 @@ export function useLifeOS(userId: string | null) {
     plannerTasks,
     plannerTasksDetailed,
     todayPlannerTasks,
+    dailyCharge,
     focusSettings,
     todayFocusBlocks,
     focusLoadPct,
@@ -4011,7 +4049,7 @@ export function useLifeOS(userId: string | null) {
     achievementViews,
     nearestAchievements,
     totalAchievements: TOTAL_ACHIEVEMENTS,
-    unlockedAchievementCount: Object.keys(achievementsState.unlocked).length,
+    unlockedAchievementCount: achievementViews.filter(a => a.isUnlocked).length,
     trackAchievementEvent,
     trackPageOpen,
     recordFocusSession,

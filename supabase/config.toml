@@ -1,0 +1,14 @@
+# Минимальный конфиг для Supabase CLI.
+# Документация: https://supabase.com/docs/guides/cli
+
+[project]
+# id задаётся при `supabase link`
+
+[functions.telegram-auth]
+verify_jwt = false
+
+[functions.telegram-bot]
+verify_jwt = false
+
+[functions.telegram-reminders]
+verify_jwt = false

@@ -19,7 +19,7 @@ type Props = {
   matrixMode?: boolean
   /** Позволить добавить привычки при создании (для мудборда) */
   allowAttachHabits?: boolean
-  /** Показать галочку «Добавить на мудборд» */
+  /** Показать галочку «Добавить на доску идей» */
   showMoodboardOption?: boolean
 }
 
@@ -463,7 +463,7 @@ export function GoalFormModal({
           <div className="space-y-3">
             {habitDrafts.length === 0 ? (
               <p className="rounded-xl bg-canvas px-3 py-3 text-sm font-medium text-muted ring-1 ring-line">
-                Можно создать только цель — или сразу добавить привычки, они появятся на мудборде со
+                Можно создать только цель — или сразу добавить привычки, они появятся на доске идей со
                 стрелками.
               </p>
             ) : (
@@ -575,7 +575,7 @@ export function GoalFormModal({
                 className="mt-0.5 h-4 w-4 accent-[var(--brand,#7c3aed)]"
               />
               <span>
-                <span className="block text-sm font-bold text-ink">Добавить цель на мудборд?</span>
+                <span className="block text-sm font-bold text-ink">Добавить цель на доску идей?</span>
                 <span className="mt-0.5 block text-[12px] font-medium text-muted">
                   Поставь галочку — стикер появится в свободном месте на доске
                   {habitDrafts.some((h) => h.name.trim())
@@ -683,7 +683,7 @@ export function GoalFormModal({
       showMoodboardOption ? addToMoodboard : undefined,
     )
     if (result && !result.ok) {
-      setError(result.reason ?? 'Недостаточно алмазов')
+      setError(result.reason ?? 'Недостаточно энергии')
       return
     }
     blurActiveInput()

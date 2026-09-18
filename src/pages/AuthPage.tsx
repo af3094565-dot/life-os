@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Sparkles } from 'lucide-react'
 import type { AuthState } from '../hooks/useAuth'
 import { ensureOwnerAccount, OWNER_ACCOUNT } from '../lib/auth'
+import { isTelegramMiniApp } from '../lib/telegram'
 
 type Mode = 'register' | 'login'
 
@@ -13,14 +14,19 @@ type Props = {
 export function AuthPage({ auth, onRegistered }: Props) {
   const [mode, setMode] = useState<Mode>('login')
   const [name, setName] = useState('')
-  const [email, setEmail] = useState<string>(OWNER_ACCOUNT.email)
-  const [password, setPassword] = useState<string>(OWNER_ACCOUNT.password)
+  const [email, setEmail] = useState<string>(
+    auth.cloudEnabled ? '' : OWNER_ACCOUNT.email,
+  )
+  const [password, setPassword] = useState<string>(
+    auth.cloudEnabled ? '' : OWNER_ACCOUNT.password,
+  )
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const inTelegram = isTelegramMiniApp()
 
   useEffect(() => {
-    void ensureOwnerAccount()
-  }, [])
+    if (!auth.cloudEnabled) void ensureOwnerAccount()
+  }, [auth.cloudEnabled])
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -46,6 +52,21 @@ export function AuthPage({ auth, onRegistered }: Props) {
     }
   }
 
+  const submitTelegram = async () => {
+    setError('')
+    setBusy(true)
+    try {
+      const result = await auth.loginTelegram()
+      if (!result.ok) {
+        setError(result.reason)
+        return
+      }
+      onRegistered()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-canvas px-4 py-10">
       <div
@@ -64,13 +85,26 @@ export function AuthPage({ auth, onRegistered }: Props) {
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-ink">Life OS</h1>
           <p className="mt-2 text-sm font-medium text-muted">
-            {mode === 'register'
-              ? 'Создай аккаунт и начни строить свою систему жизни'
-              : 'Войди, чтобы продолжить'}
+            {inTelegram
+              ? 'Войди через Telegram — данные синхронизируются с сайтом'
+              : mode === 'register'
+                ? 'Создай аккаунт и начни строить свою систему жизни'
+                : 'Войди, чтобы продолжить'}
           </p>
         </div>
 
         <div className="rounded-2xl bg-surface p-6 shadow-[0_1px_3px_rgba(26,26,46,0.06)] ring-1 ring-line">
+          {inTelegram && auth.cloudEnabled && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void submitTelegram()}
+              className="mb-4 w-full rounded-xl bg-[#2AABEE] px-4 py-2.5 text-sm font-extrabold text-white transition hover:brightness-95 disabled:opacity-60"
+            >
+              {busy ? 'Подождите…' : 'Войти через Telegram'}
+            </button>
+          )}
+
           <div className="mb-5 flex rounded-xl bg-canvas p-1">
             {(
               [
@@ -84,7 +118,7 @@ export function AuthPage({ auth, onRegistered }: Props) {
                 onClick={() => {
                   setMode(id)
                   setError('')
-                  if (id === 'login') {
+                  if (id === 'login' && !auth.cloudEnabled) {
                     setEmail(OWNER_ACCOUNT.email)
                     setPassword(OWNER_ACCOUNT.password)
                   } else {
@@ -164,11 +198,18 @@ export function AuthPage({ auth, onRegistered }: Props) {
             </button>
           </form>
 
-          {mode === 'login' && (
+          {mode === 'login' && !auth.cloudEnabled && (
             <p className="mt-4 rounded-xl bg-canvas px-3 py-2.5 text-center text-xs font-medium text-muted">
-              Логин: <span className="font-bold text-ink">{OWNER_ACCOUNT.email}</span>
+              Локальный режим. Логин:{' '}
+              <span className="font-bold text-ink">{OWNER_ACCOUNT.email}</span>
               <br />
               Пароль: <span className="font-bold text-ink">{OWNER_ACCOUNT.password}</span>
+            </p>
+          )}
+
+          {auth.cloudEnabled && (
+            <p className="mt-4 text-center text-xs font-medium text-muted">
+              Облачная синхронизация с сайтом и Telegram включена
             </p>
           )}
         </div>

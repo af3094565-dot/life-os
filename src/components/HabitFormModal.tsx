@@ -12,7 +12,7 @@ import { findLifeArea, type LifeAreaId } from '../data/lifeMap'
 import type { NewHabitInput, UpdateHabitInput } from '../hooks/useLifeOS'
 import {
   ECONOMY,
-  canAfford,
+  canAffordHabit,
   formatDiamonds,
   habitCostHint,
   lifeMapHabitCostHint,
@@ -51,7 +51,7 @@ type Props = {
   fromMatrix?: boolean
   /** Не давать менять цель — уже закреплена */
   lockGoal?: boolean
-  /** Показать галочку «Добавить на мудборд» */
+  /** Показать галочку «Добавить на доску идей» */
   showMoodboardOption?: boolean
 }
 
@@ -87,7 +87,7 @@ export function HabitFormModal({
   const [wizardStep, setWizardStep] = useState(0)
   const [showDetails, setShowDetails] = useState(false)
   const [highlight, setHighlight] = useState<{ name?: boolean; start?: boolean }>({})
-  const affordable = isEdit || cost <= 0 || canAfford(diamonds, cost)
+  const affordable = isEdit || cost <= 0 || canAffordHabit(diamonds, cost)
   const area = findLifeArea(lifeArea ?? habit?.lifeArea)
   const costHintFn = fromLifeMap || area ? lifeMapHabitCostHint : habitCostHint
   const modalTitle =
@@ -448,7 +448,7 @@ export function HabitFormModal({
                   />
                   <span>
                     <span className="block text-sm font-bold text-ink">
-                      Добавить привычку на мудборд?
+                      Добавить привычку на доску идей?
                     </span>
                     <span className="mt-0.5 block text-[12px] font-medium text-muted">
                       Стикер появится на рабочем столе
@@ -459,23 +459,23 @@ export function HabitFormModal({
               <div className="rounded-xl bg-sky-50 px-3 py-3 text-sm text-sky-950 ring-1 ring-sky-100">
                 <p className="font-extrabold">
                   {cost <= 0
-                    ? `Бесплатно · у тебя ${formatDiamonds(diamonds)} 💎`
-                    : `💎 Создание привычки · ${formatDiamonds(cost)}`}
+                    ? `Бесплатно · у тебя ${formatDiamonds(diamonds)} 🔋`
+                    : `🔋 Создание привычки · ${formatDiamonds(cost)}`}
                 </p>
                 {cost > 0 && (
                   <ul className="mt-2 space-y-1 text-[13px] font-medium text-sky-900/80">
-                    <li>У тебя: {formatDiamonds(diamonds)} 💎</li>
+                    <li>У тебя: {formatDiamonds(diamonds)} 🔋</li>
                     <li>
                       После останется:{' '}
                       <span className="font-extrabold">
-                        {formatDiamonds(Math.max(0, diamonds - cost))} 💎
+                        {formatDiamonds(diamonds - cost)} 🔋
                       </span>
                     </li>
                   </ul>
                 )}
                 <p className="mt-1 text-[12px] font-medium text-sky-900/70">
                   {cost <= 0
-                    ? 'Привычка с карты цели не списывает алмазы.'
+                    ? 'Привычка с карты цели не списывает энергию.'
                     : costHintFn(diamonds)}
                 </p>
               </div>
@@ -644,7 +644,7 @@ export function HabitFormModal({
       showMoodboardOption ? addToMoodboard : undefined,
     )
     if (result && !result.ok) {
-      setError(result.reason ?? 'Недостаточно алмазов')
+      setError(result.reason ?? 'Недостаточно энергии')
       return
     }
     blurActiveInput()

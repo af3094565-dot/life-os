@@ -391,7 +391,8 @@ export const QUEST_CATALOG: QuestTemplate[] = [
 ]
 
 export function questReward(cost: QuestCost): number {
-  return cost * 2
+  void cost
+  return 0
 }
 
 export function findQuestTemplate(id: string): QuestTemplate | undefined {

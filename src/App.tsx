@@ -7,6 +7,7 @@ import { HabitFormModal } from './components/HabitFormModal'
 import { MobileNav } from './components/MobileNav'
 import { ProTourOfferModal } from './components/ProTourOfferModal'
 import { QuickAdd, QuickAddFab, type QuickAddKind } from './components/QuickAdd'
+import { SectionNavigation } from './components/SectionNavigation'
 import { Sidebar } from './components/Sidebar'
 import { TourOverlay } from './components/TourOverlay'
 import { TrainingOfferModal } from './components/TrainingOfferModal'
@@ -33,7 +34,6 @@ import { ProgressPage } from './pages/Progress'
 import { QuestsPage } from './pages/Quests'
 import { AchievementsPage } from './pages/Achievements'
 import { AchievementUnlockModal } from './components/achievements/AchievementUnlockModal'
-import { getAchievementDefinition } from './lib/achievements'
 import { placeLifeMapOnMoodboard } from './components/desktop/moodboard/placeOnMoodboard'
 import {
   submitGoalWithMoodboardOption,
@@ -59,22 +59,17 @@ export default function App() {
   const [goalFormOpen, setGoalFormOpen] = useState(false)
   const { toast, showToast, clearToast } = useActionToast()
   const [achievementPopupId, setAchievementPopupId] = useState<string | null>(null)
-  const [achievementBatch, setAchievementBatch] = useState<{
-    count: number
-    xp: number
-    diamonds: number
-    ids: string[]
-  } | null>(null)
+
+
+  useEffect(() => {
+    if (ctx.entityId) return
+    window.scrollTo({ top: 0 })
+    document.querySelector('.app-main-scroll')?.scrollTo({ top: 0 })
+  }, [page, ctx.entityId])
 
   const trainingPhase = defaultTrainingPhase(auth.user?.trainingPhase)
   const freeTourActive = trainingPhase === 'free_tour'
   const proTourActive = trainingPhase === 'pro_tour'
-  const showAdvanced =
-    trainingPhase === 'completed' ||
-    trainingPhase === 'pro_tour' ||
-    trainingPhase === 'pro_offer' ||
-    auth.hasSubscription ||
-    state.habitsAll.length >= 2
 
   const go = useCallback(
     (next: PageId, opts?: { entityId?: string; returnTo?: PageId; view?: string }) => {
@@ -178,33 +173,14 @@ export default function App() {
   }, [page, auth.isAuthenticated])
 
   useEffect(() => {
-    const batch = state.achievements?.pendingBatch ?? []
-    const pending = state.achievements?.pendingUnlocks ?? []
-    if (batch.length >= 4) {
-      const ids = [...batch]
-      const xp = ids.reduce(
-        (sum, id) => sum + (getAchievementDefinition(id)?.xpReward ?? 0),
-        0,
-      )
-      const diamonds = ids.reduce(
-        (sum, id) => sum + (getAchievementDefinition(id)?.diamondReward ?? 0),
-        0,
-      )
-      setAchievementBatch({ count: ids.length, xp, diamonds, ids })
-      setAchievementPopupId(null)
-      state.ackAchievementUnlocks(ids)
-      return
+    const pending = state.achievements.pendingUnlocks
+    if (pending.length && !achievementPopupId) {
+      setAchievementPopupId(pending[0])
+      state.ackAchievementUnlocks(pending)
     }
-    if (pending.length > 0 && !achievementPopupId && !achievementBatch) {
-      const next = pending[0]
-      setAchievementPopupId(next)
-      state.ackAchievementUnlocks([next])
-    }
+    // The persisted engine limits celebrations to one per day.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    state.achievements?.pendingUnlocks,
-    state.achievements?.pendingBatch,
-  ])
+  }, [state.achievements.pendingUnlocks, achievementPopupId])
 
   const handleRegistered = useCallback(() => {
     setJustRegistered(true)
@@ -222,19 +198,16 @@ export default function App() {
   const skipTraining = useCallback(() => {
     setTrainingOfferOpen(false)
     setJustRegistered(false)
-    auth.setTraining('wheel_offer')
-    setWheelOfferOpen(true)
+    auth.setTraining('completed')
   }, [auth])
 
   const completeFreeTour = useCallback(() => {
-    auth.setTraining('wheel_offer')
-    setWheelOfferOpen(true)
+    auth.setTraining('completed')
     navigate('dashboard', { replace: true })
   }, [auth, navigate])
 
   const skipFreeTour = useCallback(() => {
-    auth.setTraining('wheel_offer')
-    setWheelOfferOpen(true)
+    auth.setTraining('completed')
   }, [auth])
 
   const createWheel = useCallback(
@@ -353,6 +326,14 @@ export default function App() {
     [auth.hasSubscription, go],
   )
 
+  if (!auth.authReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-semibold text-muted">
+        Загрузка…
+      </div>
+    )
+  }
+
   if (!auth.isAuthenticated || !auth.user) {
     return <AuthPage auth={auth} onRegistered={handleRegistered} />
   }
@@ -368,18 +349,20 @@ export default function App() {
           hasSubscription={auth.hasSubscription}
           onOpenAccount={() => setAccountOpen(true)}
           onLogout={handleLogout}
-          showAdvanced={showAdvanced}
-          diamonds={state.diamonds}
+        dailyCharge={state.dailyCharge}
         />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <main className="app-main-scroll flex-1 overflow-auto px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 md:p-7 md:pb-7">
+        <main className="workspace-main app-main-scroll flex-1 overflow-auto px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 md:p-7 md:pb-7">
+          <SectionNavigation page={page} hasSubscription={auth.hasSubscription} onNavigate={(p) => navigate(p)} />
+          <div className="workspace-page-content" key={page}>
           {page === 'dashboard' && (
             <Dashboard
               state={state}
               onNavigate={go}
               userName={userName}
+              hasSubscription={auth.hasSubscription}
               isTester={isTesterUser(auth.user)}
               lifeMapDeferred={
                 !state.hasLifeMap &&
@@ -468,6 +451,7 @@ export default function App() {
           {page === 'achievements' && (
             <AchievementsPage state={state} userName={userName} onNavigate={go} />
           )}
+          </div>
         </main>
 
         <MobileNav
@@ -476,7 +460,6 @@ export default function App() {
           onOpenAccount={() => setAccountOpen(true)}
           onCreate={() => setQuickAddOpen(true)}
           createOpen={quickAddOpen}
-          hasSubscription={auth.hasSubscription}
         />
       </div>
 
@@ -539,19 +522,8 @@ export default function App() {
         <ActionToast open onClose={clearToast} {...toast} />
       )}
 
-      {(achievementPopupId || achievementBatch) && (
-        <AchievementUnlockModal
-          achievementId={achievementPopupId}
-          batchCount={achievementBatch?.count}
-          batchXp={achievementBatch?.xp}
-          batchDiamonds={achievementBatch?.diamonds}
-          soundEnabled={state.achievements?.soundEnabled}
-          onClose={() => {
-            setAchievementPopupId(null)
-            setAchievementBatch(null)
-          }}
-          onOpen={() => navigate('achievements')}
-        />
+      {achievementPopupId && (
+        <AchievementUnlockModal achievementId={achievementPopupId} onClose={() => setAchievementPopupId(null)} onOpen={() => navigate('achievements')} />
       )}
 
       <TrainingOfferModal
@@ -609,7 +581,12 @@ export default function App() {
         onLogout={handleLogout}
         onOpenLifeMap={() => navigate('life-map')}
         onRestartTraining={restartTraining}
+        onLinkTelegram={async () => {
+          const res = await auth.linkTelegram()
+          return res.ok ? { ok: true } : { ok: false, reason: res.reason }
+        }}
         diamonds={state.diamonds}
+        dailyCharge={state.dailyCharge}
         showLifeMapCta={
           !state.hasLifeMap &&
           (auth.user.lifeMapOfferStatus === 'deferred' ||

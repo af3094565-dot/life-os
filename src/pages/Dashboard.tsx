@@ -2,7 +2,6 @@ import { useEffect, useId, useState } from 'react'
 import {
   Bell,
   Check,
-  Flame,
   Plus,
   Target,
   X,
@@ -10,7 +9,9 @@ import {
 import { Header } from '../components/Header'
 import { NextActionCard } from '../components/NextActionCard'
 import { EmptyState } from '../components/EmptyState'
-import { MobileHome } from '../components/mobile/MobileHome'
+import { todayOverview } from '../lib/todayOverview'
+import { JourneyGuide } from '../components/JourneyGuide'
+import { DashboardOverview } from '../components/DashboardOverview'
 import { Card, ProgressBar } from '../components/ui'
 import type { PageId } from '../data/seed'
 import type { LifeOSState } from '../hooks/useLifeOS'
@@ -19,12 +20,13 @@ import { formatRuDate, todayKey } from '../lib/habitLogic'
 import { retroConfirmMessage } from '../lib/retroMarks'
 import { contractProgress } from '../lib/questLogic'
 
-const DIAMONDS_TIP_KEY = 'life-os-diamonds-tip-hidden'
+const DIAMONDS_TIP_KEY = 'life-os-energy-tip-hidden'
 
 type Props = {
   state: LifeOSState
   onNavigate: (page: PageId, opts?: { entityId?: string; returnTo?: PageId }) => void
   userName: string
+  hasSubscription: boolean
   isTester?: boolean
   lifeMapDeferred?: boolean
   onQuickAdd?: () => void
@@ -53,6 +55,7 @@ export function Dashboard({
   state,
   onNavigate,
   userName,
+  hasSubscription,
   isTester = false,
   lifeMapDeferred = false,
   onQuickAdd,
@@ -72,9 +75,12 @@ export function Dashboard({
   })
   const [testerModalOpen, setTesterModalOpen] = useState(false)
   const [testerAmount, setTesterAmount] = useState('100')
+  const [listFilter, setListFilter] = useState<'all' | 'pending' | 'done'>('all')
 
   const todayLabel = formatRuDate(todayKey())
-  const next = state.nextQuest
+  const overview = todayOverview(state.quests, state.todayPlannerTasks)
+  const todayHabits = overview.habits
+  const next = todayHabits.find(q => !q.done)
   const nextPending = next && !next.done ? next : null
   const activeGoals = [
     ...(state.lifeGoalsMapStat?.status === 'active'
@@ -86,13 +92,11 @@ export function Dashboard({
   const activeContract = state.activeContracts[0]
   const todayPlannerTasks = state.todayPlannerTasks
   const pendingTasks = todayPlannerTasks.filter((t) => !t.completedAt)
-  const pendingHabits = state.quests.filter((q) => !q.done)
+  const pendingHabits = todayHabits.filter((q) => !q.done)
   const doneCount =
-    state.quests.filter((q) => q.done).length +
+    todayHabits.filter((q) => q.done).length +
     todayPlannerTasks.filter((t) => t.completedAt).length
-  const totalCount = state.quests.length + todayPlannerTasks.length
-  const dayPct =
-    totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100)
+  const totalCount = todayHabits.length + todayPlannerTasks.length
   const dayComplete =
     totalCount > 0 &&
     pendingHabits.length === 0 &&
@@ -148,7 +152,7 @@ export function Dashboard({
           onClick={(e) => e.stopPropagation()}
         >
           <h2 id={testerModalTitleId} className="text-lg font-extrabold text-ink">
-            Добавить алмазы
+            Добавить энергию
           </h2>
           <input
             type="number"
@@ -181,66 +185,25 @@ export function Dashboard({
 
   return (
     <>
-      {/* Mobile presentation — lean “what next” home */}
-      <div className="md:hidden">
-        <MobileHome
-          state={state}
-          userName={userName}
-          greeting={greetingForNow(userName)}
-          onNavigate={onNavigate}
-          onOpenCreateHabit={onOpenCreateHabit}
-          onOpenCreateTask={onOpenCreateTask}
-          onToast={onToast}
-        />
-        {isTester && (
-          <button
-            type="button"
-            onClick={() => setTesterModalOpen(true)}
-            className="mt-2 w-full rounded-xl bg-sky-50 py-3 text-sm font-bold text-sky-800 ring-1 ring-sky-200"
-          >
-            Тестер: добавить алмазы
-          </button>
-        )}
-      </div>
-
-      {/* Desktop presentation */}
-      <div className="hidden pb-8 md:block">
+      <div className="dashboard-page pb-8">
       <Header
         greeting={greetingForNow(userName)}
-        subtitle={`Сегодня, ${todayLabel} · что сделать прямо сейчас?`}
+        subtitle={`Сегодня, ${todayLabel} · немного ближе к своим целям`}
         streak={state.streak}
         diamonds={state.diamonds}
+        dailyCharge={state.dailyCharge}
         visitStreak={state.visitStreak}
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}
       />
 
-      {/* Твой день — прогресс */}
-      <Card className="mb-5 animate-fade-up">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
-              Твой день
-            </p>
-            <p className="mt-1 text-4xl font-extrabold tracking-tight text-ink">
-              {dayPct}%
-            </p>
-            <p className="mt-1 text-sm font-medium text-muted">
-              {doneCount} из {totalCount || '—'} выполнено
-            </p>
-          </div>
-          {state.streak > 0 && (
-            <div className="flex items-center gap-2 rounded-xl bg-orange-50 px-3 py-2 text-sm font-bold text-orange-700 ring-1 ring-orange-100">
-              <Flame size={16} />
-              {state.streak} дн. подряд
-            </div>
-          )}
-        </div>
-        <ProgressBar value={dayPct} className="mt-4" />
-      </Card>
 
+      <DashboardOverview state={state} done={doneCount} total={totalCount} goals={activeGoals.length}
+        onAdd={onQuickAdd ?? onOpenCreateHabit ?? (() => onNavigate('habits'))} onNavigate={onNavigate} />
+      <JourneyGuide state={state} hasSubscription={hasSubscription} onNavigate={onNavigate} onCreateHabit={onOpenCreateHabit ?? (() => onNavigate('habits'))} />
+      <div className="dashboard-content">
       {state.achievements.history[0] && (
-        <Card className="mb-5 animate-fade-up">
+        <Card className="dashboard-achievement animate-fade-up">
           <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
             🏆 Последнее достижение
           </p>
@@ -278,7 +241,7 @@ export function Dashboard({
       {/* Главный фокус */}
       {dayComplete ? (
         <NextActionCard
-          className="mb-5 animate-fade-up"
+          className="dashboard-focus animate-fade-up"
           title="День закрыт"
           action="Все дела на сегодня сделаны"
           cta="Смотреть прогресс"
@@ -288,7 +251,7 @@ export function Dashboard({
         />
       ) : focusTitle ? (
         <NextActionCard
-          className="mb-5 animate-fade-up"
+          className="dashboard-focus animate-fade-up"
           title="Главный фокус"
           action={focusTitle}
           related={
@@ -299,7 +262,7 @@ export function Dashboard({
                 : 'Задача из плана'
           }
           relatedHint="Зачем:"
-          cta={nextPending ? 'Отметить' : pendingTasks[0] ? 'Начать' : 'Открыть'}
+          cta={nextPending || pendingTasks[0] ? 'Отметить' : 'Открыть'}
           onAction={() => {
             if (nextPending) {
               const wasDone = nextPending.done
@@ -308,7 +271,7 @@ export function Dashboard({
                 onToast?.({
                   title: 'Выполнено',
                   subtitle: nextPending.title,
-                  diamonds: ECONOMY.DAY_REWARD,
+
                   streak: state.streak + 1,
                 })
               }
@@ -318,13 +281,13 @@ export function Dashboard({
                 title: 'Задача выполнена',
                 subtitle: pendingTasks[0].title,
               })
-            } else onNavigate('habits')
+            } else if (activeGoal) onNavigate('goals', { entityId: activeGoal.id, returnTo: 'dashboard' })
           }}
           secondaryLabel="Все задачи"
           onSecondary={() => onNavigate('planner')}
         />
       ) : (
-        <div className="mb-5">
+        <div className="dashboard-focus">
           <EmptyState
             emoji="🌱"
             title="Начни свой день"
@@ -338,9 +301,9 @@ export function Dashboard({
       )}
 
       {/* Быстрые действия */}
-      <Card className="mb-5 animate-fade-up" style={{ animationDelay: '40ms' }}>
-        <p className="text-sm font-extrabold text-ink">Что хочешь сделать?</p>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <Card className="dashboard-actions animate-fade-up" style={{ animationDelay: '40ms' }}>
+        <p className="text-sm font-extrabold text-ink">Начни что-то новое</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
           {[
             {
               label: 'Новая привычка',
@@ -386,9 +349,9 @@ export function Dashboard({
       </Card>
 
       {/* Сегодня — чеклист */}
-      <Card className="mb-5 animate-fade-up" style={{ animationDelay: '60ms' }}>
+      <Card tabIndex={-1} aria-label="Задания на сегодня" className="dashboard-checklist animate-fade-up" style={{ animationDelay: '60ms' }}>
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h3 className="text-base font-extrabold text-ink">Сегодня</h3>
+          <h3 className="text-base font-extrabold text-ink">Дела на сегодня <span className="dashboard-count">{doneCount}/{totalCount}</span></h3>
           <button
             type="button"
             onClick={() => onNavigate('habits')}
@@ -397,13 +360,17 @@ export function Dashboard({
             Все привычки
           </button>
         </div>
-        {state.quests.length === 0 && todayPlannerTasks.length === 0 ? (
+        <div className="dashboard-filters" aria-label="Фильтр дел">
+          {([{ id: 'all', label: 'Все дела' }, { id: 'pending', label: 'В процессе' }, { id: 'done', label: 'Готово' }] as const).map(filter => <button key={filter.id} type="button" aria-pressed={listFilter === filter.id} onClick={() => setListFilter(filter.id)}>{filter.label}</button>)}
+        </div>
+        {totalCount > 0 && ((listFilter === 'pending' && doneCount === totalCount) || (listFilter === 'done' && doneCount === 0)) && <p className="py-6 text-sm text-muted">{listFilter === 'pending' ? 'Всё выполнено. Отличная работа!' : 'Пока нет выполненных дел. Начни с одного небольшого шага.'}</p>}
+        {todayHabits.length === 0 && todayPlannerTasks.length === 0 ? (
           <p className="py-2 text-sm font-medium text-muted">
             Пока пусто. Добавь привычку — она появится здесь как дело дня.
           </p>
         ) : (
           <ul className="space-y-1">
-            {state.quests.map((q) => {
+            {todayHabits.filter(q => listFilter === 'all' || (listFilter === 'done' ? q.done : !q.done)).map((q) => {
               const linkedHabit = q.habitId
                 ? state.habitsAll.find((h) => h.id === q.habitId)
                 : undefined
@@ -414,6 +381,7 @@ export function Dashboard({
                 <li key={q.id}>
                   <button
                     type="button"
+                    aria-pressed={q.done}
                     onClick={() => {
                       const wasDone = q.done
                       state.toggleQuest(q.id)
@@ -421,7 +389,7 @@ export function Dashboard({
                         onToast?.({
                           title: 'Выполнено',
                           subtitle: q.title,
-                          diamonds: ECONOMY.DAY_REWARD,
+
                           streak: state.streak + 1,
                         })
                       }
@@ -455,10 +423,11 @@ export function Dashboard({
                 </li>
               )
             })}
-            {todayPlannerTasks.map((task) => (
+            {todayPlannerTasks.filter(task => listFilter === 'all' || (listFilter === 'done' ? !!task.completedAt : !task.completedAt)).map((task) => (
               <li key={task.id}>
                 <button
                   type="button"
+                  aria-pressed={Boolean(task.completedAt)}
                   onClick={() => state.togglePlannerTaskDone(task.id)}
                   className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition hover:bg-canvas"
                 >
@@ -488,7 +457,7 @@ export function Dashboard({
         )}
       </Card>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="dashboard-goals grid gap-5 sm:grid-cols-2">
         {/* Активный квест */}
         {activeContract ? (
           <Card className="animate-fade-up" style={{ animationDelay: '80ms' }}>
@@ -601,6 +570,8 @@ export function Dashboard({
         )}
       </div>
 
+      </div>
+
       {/* Напоминания */}
       {state.habitReminders.length > 0 && (
         <Card className="mt-5 border border-indigo-200 !bg-indigo-50 animate-fade-up">
@@ -686,10 +657,10 @@ export function Dashboard({
             <X size={16} />
           </button>
           <p className="pr-8 text-sm font-medium text-muted">
-            <span className="font-extrabold text-ink">{DIAMOND} Алмазы</span> —
-            внутренняя валюта. Старт {formatDiamonds(ECONOMY.START_DIAMONDS)}.
-            Привычка −{formatDiamonds(ECONOMY.HABIT_COST)}, выполнение дня +
-            {formatDiamonds(ECONOMY.DAY_REWARD)}.
+            <span className="font-extrabold text-ink">{DIAMOND} Энергия</span> —
+            одна батарейка для планов и действий. При нехватке можно создать привычку в долг.
+            Привычка −{formatDiamonds(ECONOMY.HABIT_COST)}, цель −{formatDiamonds(ECONOMY.GOAL_COST)}.
+            Первые выполнения заряжают сильнее, следующие — меньше. Правила — по нажатию на батарейку.
           </p>
         </Card>
       )}
@@ -703,7 +674,7 @@ export function Dashboard({
               onClick={() => setTesterModalOpen(true)}
               className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white"
             >
-              Добавить алмазы
+              Добавить энергию
             </button>
           </div>
         </Card>

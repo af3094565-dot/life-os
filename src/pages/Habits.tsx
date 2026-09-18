@@ -89,6 +89,7 @@ export function HabitsPage({
         subtitle="Что мне нужно повторять? · отмечай каждый день"
         streak={state.streak}
         diamonds={state.diamonds}
+        dailyCharge={state.dailyCharge}
         visitStreak={state.visitStreak}
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}

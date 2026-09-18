@@ -33,9 +33,9 @@ export function DesktopPage({ state, userName: _userName, onNavigate }: Props) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-muted">Настрой под себя</p>
-            <h1 className="mt-1 text-lg font-extrabold text-ink md:text-[20px]">Рабочий стол</h1>
+            <h1 className="mt-1 text-lg font-extrabold text-ink md:text-[20px]">Доска идей</h1>
             <p className="mt-1 text-sm font-medium text-muted">
-              Персональная панель: виджеты, мудборд, то, что хочешь видеть каждый день.
+              Собери идеи и заметки, закрепи цели и привычки. Из записи можно сделать следующий шаг.
             </p>
           </div>
 

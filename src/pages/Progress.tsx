@@ -44,7 +44,7 @@ export function ProgressPage({ state, userName, onNavigate }: Props) {
   return (
     <div className="pb-24 md:pb-0">
       <div className="mb-5 md:hidden">
-        <h1 className="text-[28px] font-extrabold tracking-tight text-ink">Прогресс</h1>
+        <h1 className="text-[28px] font-extrabold tracking-tight text-ink">Статистика</h1>
         {state.streak > 0 && (
           <p className="mt-2 text-sm font-bold text-orange-700">🔥 {state.streak} дн. подряд</p>
         )}
@@ -97,10 +97,11 @@ export function ProgressPage({ state, userName, onNavigate }: Props) {
 
       <div className="hidden md:block">
       <Header
-        greeting="Прогресс"
-        subtitle="У меня получается? · сначала вывод, потом графики"
+        greeting="Статистика"
+        subtitle="Результаты твоих привычек и целей в одном месте"
         streak={state.streak}
         diamonds={state.diamonds}
+        dailyCharge={state.dailyCharge}
         visitStreak={state.visitStreak}
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}
@@ -171,7 +172,7 @@ export function ProgressPage({ state, userName, onNavigate }: Props) {
         {[
           { label: 'Неделя', value: `${state.todayPct}%` },
           { label: 'Месяц', value: `${state.monthPct}%` },
-          { label: 'Алмазы', value: formatDiamonds(state.diamonds) },
+          { label: 'Энергия', value: formatDiamonds(state.diamonds) },
           { label: 'Привычек', value: String(state.habits.length) },
         ].map((m, i) => (
           <Card key={m.label} className="animate-fade-up" style={{ animationDelay: `${i * 50}ms` }}>
@@ -183,7 +184,7 @@ export function ProgressPage({ state, userName, onNavigate }: Props) {
 
       <Card className="mb-5 animate-fade-up">
         <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
-          🏆 Achievement Progress
+          Достижения
         </p>
         <p className="mt-1 text-2xl font-extrabold text-ink">
           {state.unlockedAchievementCount} / {state.totalAchievements}
@@ -197,8 +198,7 @@ export function ProgressPage({ state, userName, onNavigate }: Props) {
           className="mt-3"
         />
         <p className="mt-2 text-xs font-medium text-muted">
-          +{state.achievements.daily.unlocks.length} сегодня · ⭐{' '}
-          {state.achievements.achievementXp} Achievement XP
+          Маленькие победы за реальные действия. Без гонки за очками.
         </p>
         {onNavigate && (
           <button
@@ -275,7 +275,7 @@ export function ProgressPage({ state, userName, onNavigate }: Props) {
 
       <Card className="mt-5 animate-fade-up" style={{ animationDelay: '160ms' }}>
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h3 className="text-base font-extrabold text-ink">История алмазов</h3>
+          <h3 className="text-base font-extrabold text-ink">История энергии</h3>
           <span className="text-xs font-bold text-muted">
             Баланс {DIAMOND} {state.diamonds}
           </span>

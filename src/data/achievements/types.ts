@@ -205,6 +205,10 @@ export type AchievementSessionStats = {
 }
 
 export type AchievementState = {
+  collectionVersion?: 2
+  lastCelebratedDay?: string
+  archive?: { unlocked: Record<string, string>; history: AchievementHistoryEntry[] }
+
   unlocked: Record<string, string>
   /** Текущий прогресс по id ачивки */
   progress: Record<string, number>
@@ -270,7 +274,7 @@ export const ACHIEVEMENT_CATEGORY_LABELS: Record<AchievementCategory, string> = 
   calendar: 'Календарь',
   progress: 'Прогресс',
   streaks: 'Серии',
-  diamonds: 'Алмазы',
+  diamonds: 'Энергия',
   exploration: 'Исследование',
   consistency: 'Стабильность',
   comeback: 'Возвращение',

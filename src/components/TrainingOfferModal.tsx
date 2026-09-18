@@ -25,14 +25,13 @@ export function TrainingOfferModal({ open, userName, onStart, onSkip }: Props) {
           Соберём твою систему?
         </h2>
         <p className="mt-2 text-sm font-medium leading-relaxed text-muted">
-          {userName}, за пару минут покажем, как из желания получается цель, привычки и
-          план на сегодня — без сложных терминов.
+          {userName}, покажем, где добавить привычку, как запланировать день и где увидеть результат. Всего пять коротких подсказок.
         </p>
         <div className="mt-4 space-y-2 rounded-xl bg-canvas px-3 py-3 text-sm font-medium text-ink ring-1 ring-line">
-          <p className="font-extrabold">Ты увидишь цепочку:</p>
-          <p>🎯 Цель → 🔁 Привычки → 📅 План → 🏠 Сегодня → 📊 Прогресс</p>
+          <p className="font-extrabold">Четыре раздела, один маршрут:</p>
+          <p>Сегодня · Мой план · Мои цели · Результаты</p>
           <p className="text-xs font-medium text-muted">
-            Продвинутое (квесты, карта жизни, рабочий стол) — позже, когда освоишь базу.
+            Начни с одной привычки. Цели, карта жизни и квесты можно подключить позже.
           </p>
         </div>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
@@ -41,14 +40,14 @@ export function TrainingOfferModal({ open, userName, onStart, onSkip }: Props) {
             onClick={onStart}
             className="flex-1 rounded-xl bg-brand px-4 py-2.5 text-sm font-extrabold text-white hover:bg-brand-deep"
           >
-            Да, начать
+            Показать маршрут
           </button>
           <button
             type="button"
             onClick={onSkip}
             className="flex-1 rounded-xl bg-canvas px-4 py-2.5 text-sm font-extrabold text-ink ring-1 ring-line hover:bg-surface"
           >
-            Пропустить
+            Разберусь сам
           </button>
         </div>
       </div>

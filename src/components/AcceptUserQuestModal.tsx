@@ -1,7 +1,7 @@
 import { useEffect, useId } from 'react'
 import { X } from 'lucide-react'
 import type { UserQuestListing } from '../data/seed'
-import { DIAMOND, formatDiamonds, questCreatorCut } from '../lib/economy'
+import { DIAMOND, formatDiamonds } from '../lib/economy'
 import { formatDurationLabel } from '../lib/questLogic'
 
 type Props = {
@@ -25,7 +25,6 @@ export function AcceptUserQuestModal({ listing, open, onClose, onConfirm }: Prop
 
   if (!open || !listing) return null
 
-  const cut = questCreatorCut(listing.price)
 
   return (
     <div
@@ -65,7 +64,7 @@ export function AcceptUserQuestModal({ listing, open, onClose, onConfirm }: Prop
 
         <div className="mt-4 rounded-xl bg-canvas px-3 py-3 ring-1 ring-line">
           <p className="text-sm font-extrabold text-ink">
-            Ставка {formatDiamonds(listing.price)} · награда {DIAMOND} {listing.reward}
+            Ставка {formatDiamonds(listing.price)} · {DIAMOND} энергия за ежедневные действия
           </p>
           <p className="mt-1 text-xs font-medium text-muted">
             {formatDurationLabel(listing.durationDays)} · цель {listing.target}
@@ -73,7 +72,7 @@ export function AcceptUserQuestModal({ listing, open, onClose, onConfirm }: Prop
           </p>
           {!listing.isMine && (
             <p className="mt-2 text-xs font-semibold text-ink/70">
-              Автор получит {formatDiamonds(cut)} — отправь ему ссылку после покупки
+              Энергия расходуется на принятие квеста. Пересылка не приносит энергию автору.
             </p>
           )}
         </div>

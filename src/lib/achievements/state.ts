@@ -4,8 +4,8 @@ import type {
   AchievementEventType,
   AchievementSessionStats,
   AchievementState,
-} from '../../data/achievements/types'
-import { MAIN_EXPLORATION_PAGES } from '../../data/achievements/types'
+} from '../../data/achievements/types.ts'
+import { MAIN_EXPLORATION_PAGES } from '../../data/achievements/types.ts'
 
 function todayKey(d = new Date()) {
   const y = d.getFullYear()
@@ -54,6 +54,7 @@ function emptySession(now = Date.now()): AchievementSessionStats {
 
 export function createEmptyAchievementState(): AchievementState {
   return {
+    collectionVersion: 2,
     unlocked: {},
     progress: {},
     metrics: {},
@@ -64,7 +65,7 @@ export function createEmptyAchievementState(): AchievementState {
     activeTitleId: 'novice',
     achievementXp: 0,
     diamondsFromAchievements: 0,
-    soundEnabled: true,
+    soundEnabled: false,
     pendingUnlocks: [],
     pendingBatch: [],
     daily: emptyDaily(),
@@ -83,6 +84,10 @@ export function normalizeAchievementState(
 ): AchievementState {
   const base = createEmptyAchievementState()
   if (!raw || typeof raw !== 'object') return base
+  if (raw.collectionVersion !== 2) return { ...base,
+    archive: { unlocked: raw.unlocked ?? {}, history: raw.history ?? [] },
+    metrics: { focus_minutes: Number(raw.metrics?.focus_minutes) || 0 },
+  }
   const daily =
     raw.daily && raw.daily.date === todayKey()
       ? {
@@ -113,7 +118,7 @@ export function normalizeAchievementState(
     activeTitleId: raw.activeTitleId ?? 'novice',
     achievementXp: Number(raw.achievementXp) || 0,
     diamondsFromAchievements: Number(raw.diamondsFromAchievements) || 0,
-    soundEnabled: raw.soundEnabled !== false,
+    soundEnabled: raw.soundEnabled === true,
     pendingUnlocks: Array.isArray(raw.pendingUnlocks) ? raw.pendingUnlocks : [],
     pendingBatch: Array.isArray(raw.pendingBatch) ? raw.pendingBatch : [],
     daily,
@@ -133,6 +138,9 @@ export function normalizeAchievementState(
 
 /** Снимок мира для расчёта метрик */
 export type AchievementWorldSnapshot = {
+  actionsDone?: number
+  activeDays?: number
+  comebackDone?: boolean
   habitCount: number
   activeHabitCount: number
   habitCompletionsTotal: number

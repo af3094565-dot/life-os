@@ -182,7 +182,7 @@ export function MandalaMatrixModal({
               {goal?.title || 'Построй карту 9×9'}
             </h2>
             <p className="mt-1 text-sm font-medium text-muted">
-              Центр — цель (−{ECONOMY.MATRIX_COST} алмазов). Цветные блоки — аспекты. Белые ячейки
+              Центр — цель (−{ECONOMY.MATRIX_COST} энергии). Цветные блоки — аспекты. Белые ячейки
               внутри цвета — привычки (бесплатно).
             </p>
           </div>

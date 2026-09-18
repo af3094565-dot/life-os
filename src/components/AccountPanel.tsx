@@ -1,8 +1,10 @@
-import { useEffect } from 'react'
-import { Crown, GraduationCap, LogOut, X } from 'lucide-react'
+import type { DayCharge } from '../lib/dayCharge'
+import { EnergyMeter } from './EnergyMeter'
+import { useEffect, useState } from 'react'
+import { Crown, GraduationCap, Link2, LogOut, X } from 'lucide-react'
 import type { PublicUser } from '../lib/auth'
 import { findTitle } from '../lib/achievements'
-import { DIAMOND } from '../lib/economy'
+import { isTelegramMiniApp } from '../lib/telegram'
 
 type Props = {
   open: boolean
@@ -12,8 +14,10 @@ type Props = {
   onLogout: () => void
   onOpenLifeMap: () => void
   onRestartTraining?: () => void
+  onLinkTelegram?: () => Promise<{ ok: boolean; reason?: string }>
   showLifeMapCta?: boolean
   diamonds?: number
+  dailyCharge: DayCharge
   achievementSummary?: {
     unlocked: number
     total: number
@@ -32,10 +36,15 @@ export function AccountPanel({
   onLogout,
   onOpenLifeMap,
   onRestartTraining,
+  onLinkTelegram,
   showLifeMapCta = false,
   diamonds,
+  dailyCharge,
   achievementSummary,
 }: Props) {
+  const [linkBusy, setLinkBusy] = useState(false)
+  const [linkMsg, setLinkMsg] = useState<string | null>(null)
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -53,6 +62,8 @@ export function AccountPanel({
   if (!open) return null
   const title = findTitle(achievementSummary?.titleId ?? 'novice')
   const initial = (user.name.trim()[0] ?? 'Я').toUpperCase()
+  const canLinkTg =
+    !!onLinkTelegram && isTelegramMiniApp() && user.cloud && !user.telegramId
 
   return (
     <div
@@ -91,6 +102,12 @@ export function AccountPanel({
           </span>
           <p className="mt-3 text-xl font-extrabold text-ink">{user.name}</p>
           <p className="mt-0.5 text-sm font-medium text-muted">{user.email}</p>
+          {user.telegramId ? (
+            <p className="mt-1 text-xs font-semibold text-[#2AABEE]">
+              Telegram привязан
+              {user.telegramUsername ? ` (@${user.telegramUsername})` : ''}
+            </p>
+          ) : null}
           {achievementSummary && (
             <p className="mt-2 text-sm font-bold text-brand">
               {title?.emoji} {title?.label}
@@ -109,9 +126,9 @@ export function AccountPanel({
           )}
           {diamonds != null && (
             <div className="rounded-xl bg-canvas px-3 py-3 ring-1 ring-line">
-              <p className="text-[11px] font-bold uppercase text-muted">Алмазы</p>
+              <p className="text-[11px] font-bold uppercase text-muted">Энергия</p>
               <p className="mt-1 text-lg font-extrabold text-ink">
-                {DIAMOND} {diamonds}
+                <EnergyMeter value={dailyCharge.percent} />
               </p>
             </div>
           )}
@@ -127,13 +144,14 @@ export function AccountPanel({
                 <span className="text-muted">Без подписки</span>
               )}
             </div>
+            {!user.hasSubscription && <div className="mt-3 text-sm leading-relaxed text-muted"><p className="font-bold text-ink">Свяжи ежедневные действия с большими целями</p><p className="mt-2">Цели объединяют привычки, карта жизни помогает выбрать направление, а квесты поддерживают регулярность.</p><p className="mt-2 text-xs">Тестовый доступ: 0 ₽, без оплаты. Привычки, задачи и календарь доступны в базовом плане.</p></div>}
             {!user.hasSubscription && (
               <button
                 type="button"
                 onClick={onBuy}
                 className="btn-mobile mt-3 w-full bg-brand text-white hover:bg-brand-deep"
               >
-                Купить подписку
+                Попробовать Pro бесплатно
               </button>
             )}
           </div>
@@ -157,7 +175,7 @@ export function AccountPanel({
               </div>
             ) : (
               <p className="mt-2 text-sm font-medium text-muted">
-                Закрепи до 5 достижений на странице «Достижения»
+                Закрепи до 3 достижений на странице «Достижения»
               </p>
             )}
             {achievementSummary.favoriteTitle && (
@@ -178,6 +196,29 @@ export function AccountPanel({
               </button>
             )}
           </div>
+        )}
+
+        {canLinkTg && (
+          <button
+            type="button"
+            disabled={linkBusy}
+            onClick={() => {
+              void (async () => {
+                setLinkBusy(true)
+                setLinkMsg(null)
+                const res = await onLinkTelegram()
+                setLinkBusy(false)
+                setLinkMsg(res.ok ? 'Telegram привязан' : (res.reason ?? 'Ошибка'))
+              })()
+            }}
+            className="btn-mobile mt-3 flex w-full items-center justify-center gap-2 bg-[#2AABEE]/10 text-[#1a8bc7] ring-1 ring-[#2AABEE]/30"
+          >
+            <Link2 size={16} />
+            {linkBusy ? 'Привязка…' : 'Привязать Telegram к аккаунту'}
+          </button>
+        )}
+        {linkMsg && (
+          <p className="mt-2 text-center text-xs font-semibold text-muted">{linkMsg}</p>
         )}
 
         {showLifeMapCta && (

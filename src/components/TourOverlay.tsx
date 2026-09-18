@@ -61,6 +61,8 @@ function queryVisibleTourTarget(target: string): Element | null {
 function navTargetToPage(target: string): PageId | null {
   const map: Record<string, PageId> = {
     'nav-dashboard': 'dashboard',
+    'section-plan': 'habits',
+    'section-growth': 'goals',
     'nav-desktop': 'desktop',
     'nav-planner': 'planner',
     'nav-calendar': 'planner-calendar',

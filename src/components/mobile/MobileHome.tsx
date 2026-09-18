@@ -4,7 +4,6 @@ import { EmptyState } from '../EmptyState'
 import { Card, ProgressBar } from '../ui'
 import type { PageId } from '../../data/seed'
 import type { LifeOSState } from '../../hooks/useLifeOS'
-import { ECONOMY } from '../../lib/economy'
 import { contractProgress } from '../../lib/questLogic'
 
 type Props = {
@@ -77,7 +76,7 @@ export function MobileHome({
           onToast?.({
             title: 'Выполнено',
             subtitle: q.title,
-            diamonds: ECONOMY.DAY_REWARD,
+
             streak: state.streak + 1,
           })
         }
@@ -148,7 +147,7 @@ export function MobileHome({
                 onToast?.({
                   title: 'Выполнено',
                   subtitle: nextPending.title,
-                  diamonds: ECONOMY.DAY_REWARD,
+
                   streak: state.streak + 1,
                 })
               }

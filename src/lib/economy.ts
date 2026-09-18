@@ -1,7 +1,8 @@
-/** Экономика алмазов — мягкий лимит на перегрузку */
+import { ENERGY } from './energy'
+/** Экономика энергии — мягкий лимит на перегрузку */
 export const ECONOMY = {
-  /** Приветственные алмазы за регистрацию */
-  START_DIAMONDS: 20,
+  /** Стартовая энергия за регистрацию */
+  START_DIAMONDS: ENERGY.START,
   /** Создать привычку */
   HABIT_COST: 10,
   /** Привычка с карты жизни */
@@ -11,17 +12,17 @@ export const ECONOMY = {
   /** Создать матрицу целей 9×9 */
   MATRIX_COST: 20,
   /** Отметить выполнение дня */
-  DAY_REWARD: 5,
+  DAY_REWARD: ENERGY.HABIT_REWARD,
   /** Бонус за 7 дней подряд захода в приложение */
   VISIT_STREAK_DAYS: 7,
-  VISIT_STREAK_BONUS: 50,
+  VISIT_STREAK_BONUS: 0,
   /** Цены квест-контрактов */
   QUEST_COSTS: [20, 30, 50] as const,
   /** Доля автора от цены продажи пользовательского квеста */
   QUEST_CREATOR_CUT: 0.5,
   /** Мин/макс цена своего квеста */
   USER_QUEST_PRICE_MIN: 10,
-  USER_QUEST_PRICE_MAX: 200,
+  USER_QUEST_PRICE_MAX: 100,
 } as const
 
 export type QuestCostTier = (typeof ECONOMY.QUEST_COSTS)[number]
@@ -31,70 +32,79 @@ export function questCreatorCut(price: number): number {
   return Math.floor(Math.max(0, price) * ECONOMY.QUEST_CREATOR_CUT)
 }
 
-/** Эмодзи алмаза для компактных бейджей */
-export const DIAMOND = '💎'
+/** Эмодзи энергии для компактных бейджей */
+export const DIAMOND = '🔋'
 
-/** Склонение: 1 алмаз, 2 алмаза, 5 алмазов */
+/** Склонение: 1 энергия, 2 энергии, 5 энергии */
 export function diamondsWord(n: number): string {
-  const abs = Math.abs(Math.trunc(n)) % 100
-  const last = abs % 10
-  if (abs > 10 && abs < 20) return 'алмазов'
-  if (last === 1) return 'алмаз'
-  if (last >= 2 && last <= 4) return 'алмаза'
-  return 'алмазов'
+  void n
+  return 'энергии'
 }
 
 export function formatDiamonds(n: number): string {
-  return `${n} ${diamondsWord(n)}`
+  return `${Math.round(n * 100) / 100} ${diamondsWord(n)}`
 }
 
 export function canAfford(balance: number, cost: number): boolean {
-  return balance >= cost
+  return Number.isFinite(balance) && Number.isFinite(cost) && cost >= 0 && balance - cost >= -ENERGY.DEBT_LIMIT
+}
+
+/** A new habit may be the first step out of an empty reserve, but debt cannot grow. */
+export function canAffordHabit(balance: number, cost: number): boolean {
+  return Number.isFinite(balance) && Number.isFinite(cost) && cost >= 0 && balance - cost >= -ENERGY.DEBT_LIMIT || (balance === 0 && cost > 0)
 }
 
 /** Награда за выполнение контракта = ×2 от цены */
 export function questContractReward(cost: number): number {
-  return cost * 2
+  void cost
+  return ENERGY.GOAL_REWARD
 }
 
 export function questCostHint(balance: number, cost: number): string {
   if (canAfford(balance, cost)) {
-    return `−${formatDiamonds(cost)} · при успехе +${formatDiamonds(questContractReward(cost))}`
+    return `−${formatDiamonds(cost)} · энергия за ежедневные действия`
   }
-  return `Нужно ${formatDiamonds(cost)} (сейчас ${formatDiamonds(balance)}). Отмечай дни и копи алмазы.`
+  return `Нужно ${formatDiamonds(cost)} (сейчас ${formatDiamonds(balance)}). Отмечай дни и копи энергию.`
 }
 
 export function habitCostHint(balance: number): string {
-  if (canAfford(balance, ECONOMY.HABIT_COST)) {
-    return `−${formatDiamonds(ECONOMY.HABIT_COST)} · за день +${formatDiamonds(ECONOMY.DAY_REWARD)}`
+  if (balance === 0) {
+    return `−${formatDiamonds(ECONOMY.HABIT_COST)} · можно создать в долг, затем зарядить выполнением`
   }
-  return `Нужно ${formatDiamonds(ECONOMY.HABIT_COST)} (сейчас ${formatDiamonds(balance)}). Войди в ритм — отмечай дни и копи алмазы.`
+  if (canAfford(balance, ECONOMY.HABIT_COST)) {
+    return creationHint(balance, ECONOMY.HABIT_COST)
+  }
+  return `Нужно ${formatDiamonds(ECONOMY.HABIT_COST)} (сейчас ${formatDiamonds(balance)}). Войди в ритм — отмечай дни и копи энергию.`
 }
 
 export function lifeMapHabitCostHint(balance: number): string {
-  if (canAfford(balance, ECONOMY.LIFE_MAP_HABIT_COST)) {
-    return `−${formatDiamonds(ECONOMY.LIFE_MAP_HABIT_COST)} · за день +${formatDiamonds(ECONOMY.DAY_REWARD)}`
+  if (balance === 0) {
+    return `−${formatDiamonds(ECONOMY.LIFE_MAP_HABIT_COST)} · можно создать в долг, затем зарядить выполнением`
   }
-  return `Нужно ${formatDiamonds(ECONOMY.LIFE_MAP_HABIT_COST)} (сейчас ${formatDiamonds(balance)}). Отмечай дни и копи алмазы.`
+  if (canAfford(balance, ECONOMY.LIFE_MAP_HABIT_COST)) {
+    return creationHint(balance, ECONOMY.LIFE_MAP_HABIT_COST)
+  }
+  return `Нужно ${formatDiamonds(ECONOMY.LIFE_MAP_HABIT_COST)} (сейчас ${formatDiamonds(balance)}). Отмечай дни и копи энергию.`
 }
 
 export function goalCostHint(balance: number): string {
   if (canAfford(balance, ECONOMY.GOAL_COST)) {
-    return `−${formatDiamonds(ECONOMY.GOAL_COST)} · сначала привычки, потом масштаб`
+    return creationHint(balance, ECONOMY.GOAL_COST)
   }
-  return `Нужно ${formatDiamonds(ECONOMY.GOAL_COST)} (сейчас ${formatDiamonds(balance)}). Не перегружай себя: заработай алмазы ритмом, потом ставь новые цели.`
+  return `Нужно ${formatDiamonds(ECONOMY.GOAL_COST)} (сейчас ${formatDiamonds(balance)}). Не перегружай себя: заработай энергию ритмом, потом ставь новые цели.`
 }
 
 export function matrixCostHint(balance: number): string {
   if (canAfford(balance, ECONOMY.MATRIX_COST)) {
-    return `−${formatDiamonds(ECONOMY.MATRIX_COST)} · привычки на карте бесплатны`
+    return creationHint(balance, ECONOMY.MATRIX_COST)
   }
-  return `Нужно ${formatDiamonds(ECONOMY.MATRIX_COST)} (сейчас ${formatDiamonds(balance)}). Карта цели — большая ставка: сначала накопи алмазы.`
+  return `Нужно ${formatDiamonds(ECONOMY.MATRIX_COST)} (сейчас ${formatDiamonds(balance)}). Карта цели — большая ставка: сначала накопи энергию.`
 }
 
-/** Причина движения алмазов */
+/** Причина движения энергии */
 export type DiamondTxReason =
   | 'start'
+  | 'goal_complete'
   | 'day_mark'
   | 'day_unmark'
   | 'habit_create'
@@ -167,4 +177,9 @@ export function formatTxTime(iso: string): string {
   } catch {
     return iso
   }
+}
+
+function creationHint(balance: number, cost: number): string {
+  const after = Math.round((balance - cost) * 100) / 100
+  return after < 0 ? `После создания: ${after} энергии. Это долг — батарейка станет чёрной. Выполнение дел восстановит заряд. Лимит долга: 100.` : `−${cost} энергии · после создания ${after}. Выполняй дела, чтобы восстановить заряд.`
 }

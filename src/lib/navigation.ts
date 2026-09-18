@@ -25,9 +25,9 @@ export function pageLabel(page: PageId): string {
     case 'dashboard':
       return 'Сегодня'
     case 'desktop':
-      return 'Рабочий стол'
+      return 'Доска идей'
     case 'planner':
-      return 'План'
+      return 'Задачи'
     case 'planner-calendar':
       return 'Календарь'
     case 'habits':
@@ -39,7 +39,7 @@ export function pageLabel(page: PageId): string {
     case 'life-map':
       return 'Карта жизни'
     case 'progress':
-      return 'Прогресс'
+      return 'Статистика'
     case 'achievements':
       return 'Достижения'
     default:

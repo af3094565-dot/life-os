@@ -22,14 +22,6 @@ const OPTIONS: {
   pro?: boolean
 }[] = [
   {
-    kind: 'goal',
-    emoji: '🎯',
-    label: 'Цель',
-    hint: 'Куда хочешь прийти',
-    icon: Target,
-    pro: true,
-  },
-  {
     kind: 'habit',
     emoji: '🔥',
     label: 'Привычку',
@@ -44,6 +36,14 @@ const OPTIONS: {
     icon: StickyNote,
   },
   {
+    kind: 'goal',
+    emoji: '🎯',
+    label: 'Цель',
+    hint: 'Куда хочешь прийти',
+    icon: Target,
+    pro: true,
+  },
+  {
     kind: 'quest',
     emoji: '⚔',
     label: 'Квест',
@@ -55,7 +55,7 @@ const OPTIONS: {
     kind: 'note',
     emoji: '📝',
     label: 'Запись',
-    hint: 'Идея на рабочий стол',
+    hint: 'Идея на доску, которую можно превратить в цель',
     icon: StickyNote,
   },
 ]
@@ -107,7 +107,7 @@ export function QuickAdd({
               Создать
             </h2>
             <p className="mt-1 text-sm font-medium text-muted">
-              Выбери — дальше откроется короткий мастер
+              Привычка — регулярно. Задача — на дату. Цель — ради результата.
             </p>
           </div>
           <button

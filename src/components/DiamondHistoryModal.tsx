@@ -1,8 +1,9 @@
+import type { DayCharge } from '../lib/dayCharge'
+import { EnergyMeter } from './EnergyMeter'
 import { useEffect, useId } from 'react'
 import { History, X } from 'lucide-react'
 import {
   DIAMOND,
-  formatDiamonds,
   formatTxAmount,
   formatTxTime,
   type DiamondTx,
@@ -12,10 +13,11 @@ type Props = {
   open: boolean
   onClose: () => void
   diamonds: number
+  dailyCharge: DayCharge
   history: DiamondTx[]
 }
 
-export function DiamondHistoryModal({ open, onClose, diamonds, history }: Props) {
+export function DiamondHistoryModal({ open, onClose, history, dailyCharge }: Props) {
   const titleId = useId()
 
   useEffect(() => {
@@ -49,10 +51,10 @@ export function DiamondHistoryModal({ open, onClose, diamonds, history }: Props)
             </div>
             <div>
               <h2 id={titleId} className="text-base font-extrabold text-ink">
-                История алмазов
+                Твоя энергия
               </h2>
               <p className="mt-0.5 text-sm font-medium text-muted">
-                Баланс: {DIAMOND} {formatDiamonds(diamonds)}
+                <EnergyMeter value={dailyCharge.percent} />
               </p>
             </div>
           </div>
@@ -67,9 +69,20 @@ export function DiamondHistoryModal({ open, onClose, diamonds, history }: Props)
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+          <div className="energy-rules">
+            <strong>Выполняй задания и пополняй энергию</strong>
+            <p>Это одна батарейка. Привычка стоит 10, цель — 15. При нехватке можно уйти в долг до −100: батарейка становится чёрной и треснувшей.</p>
+            <p>Четыре выполнения дают полный заряд. В большом плане первые действия заряжают сильнее: 1 из 20 — около 13%, 50 из 100 — около 85%. Оставшиеся 50 дают ещё 15%, всего — 100%.</p>
+            <p>Затраты и долг учитываются: награды постепенно восстанавливают недостающую энергию. Поэтому фактический прирост может отличаться от примеров без затрат.</p>
+            <details><summary>Почему нельзя накрутить заряд</summary>
+              <p>Кривая наград фиксируется после первого выполнения. В маленьком плане можно заполнить четыре места. Дополнительные дела сверх зафиксированного плана попадут в награды на следующий день. Удаление дел не уменьшает знаменатель.</p>
+              <p>Одно действие оплачивается один раз в день. Повторная отметка, отметка за прошлое и пересылка квестов не дают повторную энергию. Созданная сегодня привычка может заряжать батарейку сразу.</p>
+              <p>На следующий день положительный заряд начинается с нуля; долг сохраняется. История выполнения остаётся. Если потратить энергию после полного выполнения плана, повторно получить те же награды нельзя.</p>
+            </details>
+          </div>
           {history.length === 0 ? (
             <p className="py-8 text-center text-sm font-medium text-muted">
-              Пока пусто. Отмечай дни, покупай привычки и квесты — здесь появится история.
+              Здесь появятся затраты на новые планы и энергия, возвращённая за действия.
             </p>
           ) : (
             <ul className="space-y-1">
@@ -90,7 +103,7 @@ export function DiamondHistoryModal({ open, onClose, diamonds, history }: Props)
                       {earn ? '+' : '−'}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-ink">{tx.label}</p>
+                      <p className="text-sm font-semibold text-ink">{tx.label.replace(/алмазов/gi, 'энергии').replace(/алмазы/gi, 'энергия')}</p>
                       <p className="mt-0.5 text-[11px] font-medium text-muted">
                         {formatTxTime(tx.at)}
                         <span className="mx-1 text-line">·</span>

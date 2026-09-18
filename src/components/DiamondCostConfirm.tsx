@@ -12,7 +12,7 @@ type Props = {
   onCancel: () => void
 }
 
-/** Прозрачное списание алмазов перед созданием */
+/** Прозрачное списание энергии перед созданием */
 export function DiamondCostConfirm({
   open,
   title,
@@ -87,7 +87,7 @@ export function DiamondCostConfirm({
 
         {!ok && (
           <p className="mt-3 text-sm font-semibold text-danger">
-            Не хватает алмазов. Выполни привычки или зайди несколько дней подряд.
+            Не хватает энергии. Выполни привычки или зайди несколько дней подряд.
           </p>
         )}
 

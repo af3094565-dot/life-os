@@ -11,7 +11,6 @@ import {
   X,
 } from 'lucide-react'
 import { Header } from '../components/Header'
-import { PlanTabs } from '../components/PlanTabs'
 import { StepWizard, type WizardStep } from '../components/StepWizard'
 import type { PageId } from '../data/seed'
 import type { FocusProfileId, LifeOSState, PlannerTaskEnergy } from '../hooks/useLifeOS'
@@ -361,15 +360,15 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
   return (
     <div>
       <Header
-        greeting="План"
+        greeting="Задачи"
         subtitle="Что мне нужно сделать? · задачи и фокус"
         streak={state.streak}
         diamonds={state.diamonds}
+        dailyCharge={state.dailyCharge}
         visitStreak={state.visitStreak}
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}
       />
-      <PlanTabs page="planner" onNavigate={onNavigate} />
 
       {/* Фокус-профиль и фокус-таймер перенесены вниз страницы */}
 
@@ -400,7 +399,7 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
 
       <Card className="mb-5 !py-3 animate-fade-up">
         <p className="text-sm font-medium text-muted">
-          Задачи и разделы теперь добавляются через окно. Календарь вынесен в отдельную вкладку.
+          Добавь дело и назначь дату. Оно появится в календаре; задачи на текущий день — ещё и на главной.
         </p>
       </Card>
 

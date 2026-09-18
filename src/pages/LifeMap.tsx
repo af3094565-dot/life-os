@@ -111,6 +111,7 @@ export function LifeMapPage({
           subtitle="Какие сферы жизни хочешь улучшить?"
           streak={state.streak}
           diamonds={state.diamonds}
+        dailyCharge={state.dailyCharge}
           visitStreak={state.visitStreak}
           diamondHistory={state.diamondHistory ?? []}
           userName={userName}
@@ -165,6 +166,7 @@ export function LifeMapPage({
         subtitle="Сфера → цель → привычки → прогресс"
         streak={state.streak}
         diamonds={state.diamonds}
+        dailyCharge={state.dailyCharge}
         visitStreak={state.visitStreak}
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}

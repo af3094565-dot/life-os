@@ -1,3 +1,10 @@
+import {
+  fetchCloudProfile,
+  updateCloudProfile,
+} from './cloudStore'
+import { getSupabase, isCloudEnabled, type CloudProfile } from './supabase'
+import { getTelegramInitData } from './telegram'
+
 export type LifeMapOfferStatus = 'pending' | 'accepted' | 'deferred' | 'done'
 
 /** Этап обучения: оффер → бесплатный тур → колесо → Pro-тур */
@@ -23,7 +30,12 @@ export type AuthUser = {
   trainingPhase?: TrainingPhase
 }
 
-export type PublicUser = Omit<AuthUser, 'passwordHash'>
+export type PublicUser = Omit<AuthUser, 'passwordHash'> & {
+  telegramId?: number | null
+  telegramUsername?: string | null
+  /** true = данные в Supabase */
+  cloud?: boolean
+}
 
 const USERS_KEY = 'life-os-auth-users'
 const SESSION_KEY = 'life-os-auth-session'
@@ -39,7 +51,22 @@ export const TESTER_USER_ID = 'u-owner-artem'
 
 function toPublic(user: AuthUser): PublicUser {
   const { passwordHash: _, ...rest } = user
-  return rest
+  return { ...rest, cloud: false }
+}
+
+function profileToPublic(p: CloudProfile): PublicUser {
+  return {
+    id: p.id,
+    name: p.name,
+    email: p.email ?? '',
+    createdAt: p.created_at,
+    hasSubscription: p.has_subscription,
+    lifeMapOfferStatus: p.life_map_offer_status,
+    trainingPhase: p.training_phase,
+    telegramId: p.telegram_id,
+    telegramUsername: p.telegram_username,
+    cloud: true,
+  }
 }
 
 function readUsers(): AuthUser[] {
@@ -78,8 +105,10 @@ export async function hashPassword(password: string): Promise<string> {
     .join('')
 }
 
-/** Создаёт владелецский аккаунт, если его ещё нет */
-export async function ensureOwnerAccount(): Promise<PublicUser> {
+/** Создаёт владелецский аккаунт, если его ещё нет (только local-режим) */
+export async function ensureOwnerAccount(): Promise<PublicUser | null> {
+  if (isCloudEnabled()) return null
+
   const email = OWNER_ACCOUNT.email
   const users = readUsers()
   const existing = users.find((u) => u.email === email)
@@ -100,10 +129,43 @@ export async function ensureOwnerAccount(): Promise<PublicUser> {
 }
 
 export function getSessionUser(): PublicUser | null {
+  // Синхронный снимок для первого рендера (local). Cloud подтянется в useAuth.
+  if (isCloudEnabled()) {
+    try {
+      const cached = localStorage.getItem('life-os-cloud-user')
+      if (cached) return JSON.parse(cached) as PublicUser
+    } catch {
+      /* ignore */
+    }
+    return null
+  }
   const id = readSessionUserId()
   if (!id) return null
   const user = readUsers().find((u) => u.id === id)
   return user ? toPublic(user) : null
+}
+
+function cacheCloudUser(user: PublicUser | null) {
+  if (user) localStorage.setItem('life-os-cloud-user', JSON.stringify(user))
+  else localStorage.removeItem('life-os-cloud-user')
+}
+
+export async function restoreCloudSession(): Promise<PublicUser | null> {
+  const sb = getSupabase()
+  if (!sb) return null
+  const { data } = await sb.auth.getSession()
+  if (!data.session?.user) {
+    cacheCloudUser(null)
+    return null
+  }
+  const profile = await fetchCloudProfile(data.session.user.id)
+  if (!profile) {
+    cacheCloudUser(null)
+    return null
+  }
+  const user = profileToPublic(profile)
+  cacheCloudUser(user)
+  return user
 }
 
 export function getCurrentUserName(fallback = 'Гость'): string {
@@ -128,8 +190,6 @@ export async function registerUser(input: {
   email: string
   password: string
 }): Promise<AuthResult> {
-  await ensureOwnerAccount()
-
   const name = input.name.trim()
   const email = input.email.trim().toLowerCase()
   const password = input.password
@@ -142,6 +202,36 @@ export async function registerUser(input: {
     return { ok: false, reason: 'Пароль минимум 6 символов' }
   }
 
+  if (isCloudEnabled()) {
+    const sb = getSupabase()!
+    const { data, error } = await sb.auth.signUp({
+      email,
+      password,
+      options: { data: { name } },
+    })
+    if (error) return { ok: false, reason: error.message }
+    if (!data.user) return { ok: false, reason: 'Не удалось создать аккаунт' }
+
+    await new Promise((r) => setTimeout(r, 400))
+    await updateCloudProfile(data.user.id, {
+      name,
+      training_phase: 'offer',
+      life_map_offer_status: 'pending',
+    })
+    const profile = await fetchCloudProfile(data.user.id)
+    if (!profile) {
+      return {
+        ok: false,
+        reason:
+          'Аккаунт создан, но профиль ещё не готов. Подтверди email (если включено) и войди снова.',
+      }
+    }
+    const user = profileToPublic(profile)
+    cacheCloudUser(user)
+    return { ok: true, user }
+  }
+
+  await ensureOwnerAccount()
   const users = readUsers()
   if (users.some((u) => u.email === email)) {
     return { ok: false, reason: 'Этот email уже зарегистрирован' }
@@ -167,9 +257,23 @@ export async function loginUser(input: {
   email: string
   password: string
 }): Promise<AuthResult> {
-  await ensureOwnerAccount()
-
   const email = input.email.trim().toLowerCase()
+
+  if (isCloudEnabled()) {
+    const sb = getSupabase()!
+    const { data, error } = await sb.auth.signInWithPassword({
+      email,
+      password: input.password,
+    })
+    if (error) return { ok: false, reason: 'Неверный email или пароль' }
+    const profile = await fetchCloudProfile(data.user.id)
+    if (!profile) return { ok: false, reason: 'Профиль не найден' }
+    const user = profileToPublic(profile)
+    cacheCloudUser(user)
+    return { ok: true, user }
+  }
+
+  await ensureOwnerAccount()
   const users = readUsers()
   const user = users.find((u) => u.email === email)
   if (!user) return { ok: false, reason: 'Неверный email или пароль' }
@@ -183,7 +287,99 @@ export async function loginUser(input: {
   return { ok: true, user: toPublic(user) }
 }
 
-export function logoutUser() {
+export async function loginWithTelegram(): Promise<AuthResult> {
+  if (!isCloudEnabled()) {
+    return {
+      ok: false,
+      reason: 'Облако не настроено (VITE_SUPABASE_URL / ANON_KEY)',
+    }
+  }
+  const initData = getTelegramInitData()
+  if (!initData) {
+    return { ok: false, reason: 'Открой приложение из Telegram' }
+  }
+
+  const sb = getSupabase()!
+  const base = import.meta.env.VITE_SUPABASE_URL as string
+  const res = await fetch(`${base}/functions/v1/telegram-auth`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ initData }),
+  })
+  const payload = (await res.json()) as {
+    ok?: boolean
+    error?: string
+    session?: {
+      access_token: string
+      refresh_token: string
+    }
+    profile?: CloudProfile
+  }
+  if (!res.ok || !payload.session) {
+    return { ok: false, reason: payload.error ?? 'Telegram auth failed' }
+  }
+
+  const { error } = await sb.auth.setSession({
+    access_token: payload.session.access_token,
+    refresh_token: payload.session.refresh_token,
+  })
+  if (error) return { ok: false, reason: error.message }
+
+  const profile =
+    payload.profile ??
+    (await fetchCloudProfile((await sb.auth.getUser()).data.user!.id))
+  if (!profile) return { ok: false, reason: 'Профиль не найден' }
+  const user = profileToPublic(profile)
+  cacheCloudUser(user)
+  return { ok: true, user }
+}
+
+export async function linkTelegramAccount(): Promise<AuthResult> {
+  if (!isCloudEnabled()) {
+    return { ok: false, reason: 'Облако не настроено' }
+  }
+  const initData = getTelegramInitData()
+  if (!initData) {
+    return {
+      ok: false,
+      reason: 'Привязку нужно делать из Telegram Mini App',
+    }
+  }
+  const sb = getSupabase()!
+  const { data: sess } = await sb.auth.getSession()
+  if (!sess.session) return { ok: false, reason: 'Сначала войди на сайте' }
+
+  const base = import.meta.env.VITE_SUPABASE_URL as string
+  const res = await fetch(`${base}/functions/v1/telegram-auth`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${sess.session.access_token}`,
+    },
+    body: JSON.stringify({ initData, linkOnly: true }),
+  })
+  const payload = (await res.json()) as {
+    ok?: boolean
+    error?: string
+    profile?: CloudProfile
+  }
+  if (!res.ok || !payload.profile) {
+    return { ok: false, reason: payload.error ?? 'Не удалось привязать' }
+  }
+  const user = profileToPublic(payload.profile)
+  cacheCloudUser(user)
+  return { ok: true, user }
+}
+
+export async function logoutUser() {
+  if (isCloudEnabled()) {
+    const sb = getSupabase()
+    await sb?.auth.signOut()
+    cacheCloudUser(null)
+  }
   writeSession(null)
 }
 
@@ -200,20 +396,45 @@ function updateUser(
   return toPublic(next)
 }
 
-export function purchaseSubscription(userId: string): PublicUser | null {
+export async function purchaseSubscription(userId: string): Promise<PublicUser | null> {
+  if (isCloudEnabled()) {
+    const profile = await updateCloudProfile(userId, { has_subscription: true })
+    if (!profile) return null
+    const user = profileToPublic(profile)
+    cacheCloudUser(user)
+    return user
+  }
   return updateUser(userId, { hasSubscription: true })
 }
 
-export function setLifeMapOfferStatus(
+export async function setLifeMapOfferStatus(
   userId: string,
   status: LifeMapOfferStatus,
-): PublicUser | null {
+): Promise<PublicUser | null> {
+  if (isCloudEnabled()) {
+    const profile = await updateCloudProfile(userId, {
+      life_map_offer_status: status,
+    })
+    if (!profile) return null
+    const user = profileToPublic(profile)
+    cacheCloudUser(user)
+    return user
+  }
   return updateUser(userId, { lifeMapOfferStatus: status })
 }
 
-export function setTrainingPhase(
+export async function setTrainingPhase(
   userId: string,
   trainingPhase: TrainingPhase,
-): PublicUser | null {
+): Promise<PublicUser | null> {
+  if (isCloudEnabled()) {
+    const profile = await updateCloudProfile(userId, {
+      training_phase: trainingPhase,
+    })
+    if (!profile) return null
+    const user = profileToPublic(profile)
+    cacheCloudUser(user)
+    return user
+  }
   return updateUser(userId, { trainingPhase })
 }

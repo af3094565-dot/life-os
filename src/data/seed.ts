@@ -237,7 +237,7 @@ export type UserQuestListing = {
   isMine: boolean
   authorName: string
   salesCount: number
-  /** Сумма полученных алмазов с продаж (50%) */
+  /** Сумма полученных энергии с продаж (50%) */
   earnedDiamonds: number
   needsReminder?: boolean
   reminderDefault?: string

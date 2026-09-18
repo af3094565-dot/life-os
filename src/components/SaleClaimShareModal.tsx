@@ -41,7 +41,7 @@ export function SaleClaimShareModal({ claim, open, onClose }: Props) {
     try {
       if (navigator.share) {
         await navigator.share({
-          title: `Алмазы за квест «${claim.title}»`,
+          title: `Энергия за квест «${claim.title}»`,
           text: `Я принял твой квест! Открой ссылку — получишь ${formatDiamonds(claim.cut)}.`,
           url,
         })

@@ -10,7 +10,6 @@ import {
   DIAMOND,
   ECONOMY,
   formatDiamonds,
-  questCreatorCut,
 } from '../lib/economy'
 
 const EMOJIS = ['⭐', '🔥', '💪', '🧠', '📚', '🧘', '🏃', '💧', '🎯', '🌙', '✍️', '🥗']
@@ -42,7 +41,7 @@ export function CreateUserQuestModal({ open, onClose, onSubmit }: Props) {
   const [category, setCategory] = useState<QuestCategory>('growth')
   const [kind, setKind] = useState<QuestTemplateKind>('streak')
   const [price, setPrice] = useState(30)
-  const [reward, setReward] = useState(60)
+  const reward = 0
   const [durationDays, setDurationDays] = useState(30)
   const [target, setTarget] = useState(30)
   const [timesPerWeek, setTimesPerWeek] = useState(7)
@@ -58,7 +57,6 @@ export function CreateUserQuestModal({ open, onClose, onSubmit }: Props) {
     setCategory('growth')
     setKind('streak')
     setPrice(30)
-    setReward(60)
     setDurationDays(30)
     setTarget(30)
     setTimesPerWeek(7)
@@ -78,7 +76,6 @@ export function CreateUserQuestModal({ open, onClose, onSubmit }: Props) {
 
   if (!open) return null
 
-  const creatorEarn = questCreatorCut(price)
 
   const submit = () => {
     setError('')
@@ -249,23 +246,11 @@ export function CreateUserQuestModal({ open, onClose, onSubmit }: Props) {
                 onChange={(e) => {
                   const next = Number(e.target.value)
                   setPrice(next)
-                  if (reward < next) setReward(next * 2)
                 }}
                 className="w-full rounded-xl border border-line bg-canvas px-3 py-3 text-sm font-semibold text-ink outline-none focus:ring-2 focus:ring-brand/30"
               />
             </label>
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted">
-                Награда ({DIAMOND})
-              </span>
-              <input
-                type="number"
-                min={price}
-                value={reward}
-                onChange={(e) => setReward(Number(e.target.value))}
-                className="w-full rounded-xl border border-line bg-canvas px-3 py-3 text-sm font-semibold text-ink outline-none focus:ring-2 focus:ring-brand/30"
-              />
-            </label>
+            <div className="rounded-xl bg-brand-soft p-3 text-xs text-brand">Энергию приносят ежедневные действия квеста по общей кривой дня.</div>
           </div>
 
           <div
@@ -273,10 +258,10 @@ export function CreateUserQuestModal({ open, onClose, onSubmit }: Props) {
             style={{ background: color }}
           >
             <p className="text-sm font-bold text-ink">
-              Друг платит {formatDiamonds(price)} · за успех получает {formatDiamonds(reward)}
+              Затраты на принятие: {formatDiamonds(price)}
             </p>
             <p className="mt-1 text-xs font-semibold text-ink/70">
-              Тебе с продажи — {formatDiamonds(creatorEarn)} (50%)
+              Выполняй действия квеста, чтобы восстанавливать энергию. За пересылку и повторные отметки награда не начисляется.
             </p>
           </div>
 

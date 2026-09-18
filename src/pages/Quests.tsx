@@ -24,7 +24,6 @@ import {
   QUEST_CATALOG,
   QUEST_CATEGORY_LABELS,
   findQuestTemplate,
-  questReward,
   type QuestCategory,
   type QuestTemplate,
 } from '../data/questCatalog'
@@ -33,9 +32,7 @@ import type { LifeOSState } from '../hooks/useLifeOS'
 import {
   DIAMOND,
   canAfford,
-  formatDiamonds,
   questCostHint,
-  questCreatorCut,
 } from '../lib/economy'
 import { formatRuDate } from '../lib/habitLogic'
 import {
@@ -192,7 +189,7 @@ export function QuestsPage({
       return
     }
     setSharing(result.listing)
-    setNotice('Квест готов к отправке — с продажи тебе придёт 50%')
+    setNotice('Квест готов: поделись им и проходите испытание вместе')
   }
 
   const shareContract = (contract: QuestContract) => {
@@ -233,10 +230,11 @@ export function QuestsPage({
         subtitle={
           hasSubscription
             ? 'Испытание, которое ты берёшь на себя'
-            : 'Доступно в Pro'
+            : 'Регулярные действия, срок и награда за результат'
         }
         streak={state.streak}
         diamonds={state.diamonds}
+        dailyCharge={state.dailyCharge}
         visitStreak={state.visitStreak}
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}
@@ -268,7 +266,7 @@ export function QuestsPage({
             <div className="max-w-xl">
               <h3 className="text-base font-extrabold text-ink">Что такое квест?</h3>
               <p className="mt-1.5 text-sm font-medium leading-relaxed text-muted">
-                Это испытание на срок: платишь алмазы, выполняешь привычку или список дел —
+                Это испытание на срок: платишь энергию, выполняешь привычку или список дел —
                 и получаешь награду. Можно взять из каталога или создать свой.
               </p>
             </div>
@@ -450,7 +448,7 @@ export function QuestsPage({
                         {DIAMOND} {q.cost}
                       </p>
                       <p className="text-[11px] font-bold text-success">
-                        награда {questReward(q.cost)}
+                        энергия за действия
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -561,7 +559,7 @@ export function QuestsPage({
                         </p>
                       </div>
                     </div>
-                    <StatusBadge status={c.status} reward={c.reward} />
+                    <StatusBadge status={c.status} />
                   </div>
                 </Card>
               )
@@ -662,7 +660,7 @@ function UserListingCard({
           </MetaPill>
           {showOwnerStats && (
             <MetaPill>
-              продаж {listing.salesCount} · +{listing.earnedDiamonds} {DIAMOND}
+              принят {listing.salesCount} раз
             </MetaPill>
           )}
         </div>
@@ -672,10 +670,10 @@ function UserListingCard({
           <p className="text-sm font-extrabold text-ink">
             {DIAMOND} {listing.price}
           </p>
-          <p className="text-[11px] font-bold text-success">награда {listing.reward}</p>
+          <p className="text-[11px] font-bold text-success">заряд за действия</p>
           {listing.isMine && (
             <p className="text-[11px] font-semibold text-ink/60">
-              с продажи +{questCreatorCut(listing.price)}
+              Можно поделиться с друзьями
             </p>
           )}
         </div>
@@ -758,15 +756,13 @@ function MetaPill({ children }: { children: ReactNode }) {
 
 function StatusBadge({
   status,
-  reward,
 }: {
   status: QuestContract['status']
-  reward: number
 }) {
   if (status === 'won') {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
-        <Trophy size={12} /> +{formatDiamonds(reward)}
+        <Trophy size={12} /> Завершён
       </span>
     )
   }
@@ -823,7 +819,7 @@ function ContractCard({
                 </MetaPill>
                 <MetaPill>до {formatRuDate(contract.deadline)}</MetaPill>
                 <MetaPill>
-                  ставка {DIAMOND} {contract.cost} → {contract.reward}
+                  затраты {DIAMOND} {contract.cost} · заряд за действия
                 </MetaPill>
                 {contract.fromUserListing && <MetaPill>свой / от друга</MetaPill>}
               </div>
@@ -843,7 +839,7 @@ function ContractCard({
               onClick={() => {
                 if (
                   confirm(
-                    `Отменить контракт «${contract.title}»? Алмазы не вернутся, привычка удалится.`,
+                    `Отменить контракт «${contract.title}»? Энергия не вернутся, привычка удалится.`,
                   )
                 ) {
                   state.abandonQuest(contract.id)

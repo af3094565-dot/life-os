@@ -103,6 +103,7 @@ export function GoalsPage({
           subtitle="Куда я хочу прийти?"
           streak={state.streak}
           diamonds={state.diamonds}
+        dailyCharge={state.dailyCharge}
           visitStreak={state.visitStreak}
           diamondHistory={state.diamondHistory ?? []}
           userName={userName}
@@ -125,6 +126,7 @@ export function GoalsPage({
         subtitle="Куда я хочу прийти? · цель → привычки → сегодня"
         streak={state.streak}
         diamonds={state.diamonds}
+        dailyCharge={state.dailyCharge}
         visitStreak={state.visitStreak}
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}
