@@ -20,7 +20,7 @@ export type EnergyLedger = {
   evidenceUsed: string[]; lastChallengeAt?: string;
   days?: Record<string, EnergyDay>; currentDate?: string; legacyBalance?: number;
 }
-type Habit = { id: string; createdAt: string; completions: Record<string, boolean> }
+type Habit = { intent?: 'develop' | 'reduce'; id: string; createdAt: string; completions: Record<string, boolean> }
 type Tx = { id: string; at: string; amount: number; reason: string; label: string; balanceAfter: number }
 type EnergyStore = { diamonds: number; diamondHistory: Tx[]; habits: Habit[]; energy?: EnergyLedger }
 const round = (value: number) => Math.round(value * 100) / 100
@@ -72,7 +72,7 @@ export function applyEnergyTransition<T extends EnergyStore>(previous: T, propos
   }
   const before = new Map(previous.habits.map(h => [h.id, h]))
   for (const habit of proposed.habits) {
-    if (!habit.completions[date] || before.get(habit.id)?.completions[date] || ledger.marks[habit.id]?.includes(date)) continue
+    if (habit.intent === 'reduce' || !habit.completions[date] || before.get(habit.id)?.completions[date] || ledger.marks[habit.id]?.includes(date)) continue
     ledger.marks[habit.id] = [...(ledger.marks[habit.id] ?? []), date]
     if (!day.ids.includes(habit.id) || day.claimed.includes(habit.id)) continue
     const count = day.claimed.length

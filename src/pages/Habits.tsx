@@ -1,3 +1,9 @@
+import { ReductionPanel } from '../components/life/ReductionPanel'
+import { BottomSheet } from '../components/mobile/BottomSheet'
+import { HabitCell } from '../components/life/HabitCell'
+import { HabitRecordEditor } from '../components/life/HabitRecordEditor'
+import { habitPeriod } from '../lib/life/habits'
+import type { Habit } from '../data/seed'
 import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { BackBar } from '../components/BackBar'
@@ -13,7 +19,7 @@ import {
   priorityMeta,
 } from '../data/seed'
 import type { LifeOSState } from '../hooks/useLifeOS'
-import { formatRuDate, todayKey, toDateKey } from '../lib/habitLogic'
+import { formatRuDate, toDateKey } from '../lib/habitLogic'
 import { retroConfirmMessage } from '../lib/retroMarks'
 import { submitHabitWithMoodboardOption } from '../components/desktop/moodboard/placeOnMoodboard'
 
@@ -43,6 +49,8 @@ export function HabitsPage({
   onOpenGoal,
   onToast,
 }: Props) {
+  const [record, setRecord] = useState<{habit:Habit;date:string}|null>(null)
+  const [editing, setEditing] = useState<Habit|null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const focusRef = useRef<HTMLTableRowElement | null>(null)
 
@@ -55,7 +63,7 @@ export function HabitsPage({
   const pendingHabit = pendingToday?.habitId
     ? state.habitStats.find((h) => h.id === pendingToday.habitId)
     : state.habitStats.find((h) => {
-        if (state.todayIndex < 0) return false
+        if (h.intent === 'reduce' || state.todayIndex < 0) return false
         return state.dayStatus(h.id, state.todayIndex) !== 'done'
       })
 
@@ -176,10 +184,7 @@ export function HabitsPage({
             💡
           </div>
           <p className="text-sm font-medium leading-relaxed text-muted">
-            Привычка формируется за выбранный срок. Пропуск дня{' '}
-            <span className="font-bold text-ink">продлевает срок</span>. Отметка за прошлые дни —
-            до 5 раз в месяц, потом пауза 30 суток (осталось{' '}
-            <span className="font-bold text-ink">{state.retrofillStatus.remaining}</span>).
+            Регулярность накапливается постепенно. Прошлые дни можно восстановить без ограничений; энергия за них не начисляется.
           </p>
         </div>
         {state.yesterdayMissed.length > 0 && (
@@ -245,7 +250,7 @@ export function HabitsPage({
                     <div className="flex items-start gap-3">
                       <button
                         type="button"
-                        disabled={state.todayIndex < 0}
+                        disabled={state.todayIndex < 0 || h.intent==='reduce'}
                         onClick={() => {
                           if (state.todayIndex < 0) return
                           const r = state.toggleHabitDay(h.id, state.todayIndex)
@@ -286,6 +291,10 @@ export function HabitsPage({
                           </button>
                         )}
                         <ProgressBar value={h.pct} className="mt-3" />
+                        {h.intent==="reduce"&&<ReductionPanel state={state} habit={h}/>}
+                        <button className="min-h-11 text-xs font-bold text-brand" onClick={()=>{setEditing(h);setFormOpen(true)}}>Настроить привычку</button>
+                        <div className="mt-2 flex flex-wrap gap-1">{Array.from({length:state.dayCount},(_,i)=>{const date=toDateKey(new Date(state.year,state.month,i+1));return <HabitCell key={date} habit={h} date={date} onClick={()=>setRecord({habit:h,date})}/>})}</div>
+                        <p className="mt-2 text-xs text-muted">{(()=>{const p=habitPeriod(h,toDateKey(new Date(state.year,state.month,1)),toDateKey(new Date(state.year,state.month+1,0)));return `Выполнено: ${p.done} · регулярность ${p.regularity}% · серия ${p.current} · лучшая ${p.best}`})()}</p>
                       </div>
                     </div>
                   </li>
@@ -408,55 +417,13 @@ export function HabitsPage({
                         </div>
                       </td>
                       {Array.from({ length: state.dayCount }, (_, dayIndex) => {
-                        const status = state.dayStatus(h.id, dayIndex)
-                        const outOfRange = status === 'before' || status === 'after'
-                        const isFuture = status === 'future'
-                        const locked = outOfRange || isFuture
-                        return (
-                          <td key={dayIndex} className="px-1 py-2 text-center">
-                            <button
-                              type="button"
-                              disabled={locked}
-                              title={
-                                isFuture
-                                  ? 'День ещё не наступил — отметить можно будет позже'
-                                  : undefined
-                              }
-                              aria-label={`${h.name}, день ${dayIndex + 1}`}
-                              onClick={() => {
-                                const key = toDateKey(
-                                  new Date(state.year, state.month, dayIndex + 1),
-                                )
-                                const today = todayKey()
-                                const wasDone = !!h.days[dayIndex]
-                                const willMark = !wasDone
-                                if (willMark && key < today) {
-                                  const info = state.retrofillStatus
-                                  if (!info.canUse) {
-                                    alert(info.reason)
-                                    return
-                                  }
-                                  if (!confirm(retroConfirmMessage(info.remaining))) return
-                                }
-                                const r = state.toggleHabitDay(h.id, dayIndex)
-                                if (!r.ok) alert(r.reason)
-                              }}
-                              className={`mx-auto h-6 w-6 rounded-full transition ${
-                                outOfRange
-                                  ? 'cursor-default bg-transparent opacity-25'
-                                  : isFuture
-                                    ? 'cursor-not-allowed bg-canvas ring-1 ring-line opacity-60'
-                                    : status === 'done'
-                                      ? 'bg-success shadow-sm hover:scale-110'
-                                      : status === 'missed'
-                                        ? 'bg-red-100 ring-1 ring-red-200 hover:scale-110'
-                                        : 'bg-canvas ring-1 ring-line hover:scale-110 hover:ring-brand/40'
-                              }`}
-                            />
-                          </td>
-                        )
+                        const date = toDateKey(new Date(state.year,state.month,dayIndex+1))
+                        return <td key={dayIndex} className="px-1 py-2 text-center"><HabitCell habit={h} date={date} onClick={()=>setRecord({habit:h,date})}/></td>
                       })}
                       <td className="min-w-[130px] px-3 py-2">
+                        {h.intent==="reduce"&&<ReductionPanel state={state} habit={h}/>}
+                        <button className="min-h-11 text-xs text-brand" onClick={()=>{setEditing(h);setFormOpen(true)}}>Настроить</button>
+                        <p className="text-[10px] text-muted">{(()=>{const p=habitPeriod(h,toDateKey(new Date(state.year,state.month,1)),toDateKey(new Date(state.year,state.month+1,0)));return `Серия ${p.current} · лучшая ${p.best} · ${p.regularity}%`})()}</p>
                         <div className="text-[11px] font-bold text-muted">
                           {h.totalDone}/{h.targetDays} · {d.label}
                         </div>
@@ -533,9 +500,15 @@ export function HabitsPage({
         </Card>
       </div>
 
+      {record && record.habit.intent!=="reduce" && <HabitRecordEditor state={state} habit={record.habit} date={record.date} onClose={()=>setRecord(null)}/>}
+      {record?.habit.intent==="reduce"&&<BottomSheet open onClose={()=>setRecord(null)} title={record.habit.name}><ReductionPanel state={state} habit={record.habit} date={record.date}/></BottomSheet>}
       <HabitFormModal
+        habits={state.habitsAll}
+        directionLocked={state.contracts.some(c=>c.habitId===editing?.id&&c.status==="active")}
+        habit={editing}
+        onUpdate={state.updateHabit}
         open={formOpen}
-        onClose={() => setFormOpen(false)}
+        onClose={() => {setFormOpen(false);setEditing(null)}}
         onSubmit={(input, addToMoodboard) =>
           submitHabitWithMoodboardOption(state, input, addToMoodboard)
         }

@@ -28,7 +28,7 @@ export type AchievementStoreSlice = {
 }
 
 export function buildWorldSnapshot(s: AchievementStoreSlice): AchievementWorldSnapshot {
-  const habits = s.habits ?? []
+  const habits = (s.habits ?? []).filter(h=>h.intent!=='reduce')
   const goals = s.goals ?? []
   const contracts = s.contracts ?? []
   const tasks = s.plannerTasks ?? []

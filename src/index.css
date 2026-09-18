@@ -490,3 +490,9 @@ select {
 .life-button:disabled { opacity: .45; }
 .life-button.secondary { background: var(--color-brand-soft); color: var(--color-brand); }
 .life-muted { color: var(--color-muted); font-size: 13px; }
+.habit-cell { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--color-line); background: var(--color-canvas); font-size: 13px; color: white; }
+.habit-cell.done { background: var(--color-brand); border-color: var(--color-brand); }
+.habit-cell.missed { background: #fee2e2; color: var(--color-muted); }
+.habit-cell.outside { opacity: .25; }
+.habit-cell.unknown { border-style: dashed; }
+.habit-cell:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }

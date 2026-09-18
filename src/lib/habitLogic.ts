@@ -132,6 +132,7 @@ export function isVisibleInMonth(
 
 /** Активна сегодня (можно/нужно выполнять) */
 export function isActiveToday(habit: Habit, today: string = todayKey()): boolean {
+  if(habit.intent === "reduce") return false
   if (compareKeys(today, habit.startDate) < 0) return false
   if (isFormed(habit)) return false
   const end = effectiveEndDate(habit)
@@ -144,6 +145,7 @@ export function isDueToday(habit: Habit, today: string = todayKey()): boolean {
 
 /** Нужно ли было выполнить в конкретный день (для вчера / ретро-отметок) */
 export function isDueOnDate(habit: Habit, date: string): boolean {
+  if(habit.intent === "reduce") return false
   if (compareKeys(date, habit.startDate) < 0) return false
   if (habit.completions[date]) return false
   if (completedCount(habit) >= habit.targetDays) return false

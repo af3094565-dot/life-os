@@ -33,3 +33,11 @@ test('sleep belongs to wake date',()=>{
  const l=emptyLife();l.events=[{id:'s',name:'Сон',category:'sleep',date:'2026-09-16',start:'23:00',end:'07:00',endDate:'2026-09-17',kind:'interval',source:'manual'}]
  assert.equal(indicatorValue(l,'sleep','2026-09-17')?.value,8);assert.equal(indicatorValue(l,'sleep','2026-09-16'),undefined)
 })
+import { habitDay, reconcileHabitRecords } from '../src/lib/life/habits.ts'
+test('partial amounts do not complete and legacy targets survive changes',()=>{
+ const h={...habit,quantityTarget:30,records:{'2024-01-01':{value:10,target:30,confirmed:true}},completions:{}}
+ assert.equal(habitDay(h,'2024-01-01').kind,'partial')
+ const old={habits:[{...habit,quantityTarget:30}]};const next=reconcileHabitRecords(old,{habits:[{...old.habits[0],quantityTarget:60}]})
+ assert.equal(next.habits[0].records?.['2024-01-01'].target,30)
+ assert.equal(next.habits[0].records?.['2024-01-01'].at,undefined)
+})

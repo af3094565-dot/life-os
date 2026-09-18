@@ -598,9 +598,7 @@ export function Dashboard({
       {state.yesterdayMissed.length > 0 && (
         <Card className="mt-5 animate-fade-up">
           <p className="text-sm font-medium text-muted">
-            Забыл отметить вчера? Осталось{' '}
-            <span className="font-bold text-ink">{state.retrofillStatus.remaining}</span>{' '}
-            из 5 отметок за прошлое в этом месяце.
+            Забыл отметить вчера? Восстанови день — без лимита и без начисления энергии.
           </p>
           <button
             type="button"

@@ -1,4 +1,4 @@
-import { addDays, todayKey } from './habitLogic'
+import { todayKey } from './habitLogic'
 
 export const RETRO_MAX_PER_MONTH = 5
 export const RETRO_BLOCK_DAYS = 30
@@ -49,57 +49,16 @@ export type RetrofillInfo = {
 
 export function retrofillInfo(
   raw: RetroMarksState | undefined,
-  today = todayKey(),
+  _today = todayKey(),
 ): RetrofillInfo {
-  const state = normalizeRetroMarks(raw, today)
-  if (state.blockedUntil && compareDateKeys(today, state.blockedUntil) <= 0) {
-    return {
-      canUse: false,
-      remaining: 0,
-      used: state.used,
-      blockedUntil: state.blockedUntil,
-      reason: `Отметки за прошлые дни недоступны до ${formatRuShort(state.blockedUntil)} (лимит ${RETRO_MAX_PER_MONTH} раз в месяц).`,
-    }
-  }
-  const remaining = Math.max(0, RETRO_MAX_PER_MONTH - state.used)
-  if (remaining <= 0) {
-    return {
-      canUse: false,
-      remaining: 0,
-      used: state.used,
-      reason: `Лимит ${RETRO_MAX_PER_MONTH} отметок за прошлое в этом месяце исчерпан.`,
-    }
-  }
-  return { canUse: true, remaining, used: state.used, blockedUntil: state.blockedUntil }
+  return {canUse:true, remaining:Number.MAX_SAFE_INTEGER, used:raw?.used??0}
 }
 
 export function consumeRetrofill(
   raw: RetroMarksState | undefined,
   today = todayKey(),
 ): RetroMarksState {
-  const state = normalizeRetroMarks(raw, today)
-  const used = state.used + 1
-  let blockedUntil = state.blockedUntil
-  if (used >= RETRO_MAX_PER_MONTH) {
-    blockedUntil = addDays(today, RETRO_BLOCK_DAYS)
-  }
-  return {
-    monthKey: currentMonthKey(parseDateFromKey(today)),
-    used,
-    blockedUntil,
-  }
+  return normalizeRetroMarks(raw,today)
 }
 
-function formatRuShort(key: string): string {
-  const d = parseDateFromKey(key)
-  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
-}
-
-export function retroConfirmMessage(remaining: number, count = 1): string {
-  const after = Math.max(0, remaining - count)
-  return (
-    `Отметить прошлый день? Это использует лимит: ${count} из ${remaining} оставшихся ` +
-    `(${RETRO_MAX_PER_MONTH} в месяц). После ${RETRO_MAX_PER_MONTH} раз — пауза ${RETRO_BLOCK_DAYS} суток. ` +
-    `После этой отметки останется ${after}.`
-  )
-}
+export function retroConfirmMessage(_remaining: number, _count = 1): string { return 'Восстановить прошлое выполнение? Игровая энергия за прошлые дни не начисляется.' }

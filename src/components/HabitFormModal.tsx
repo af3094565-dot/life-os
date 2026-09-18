@@ -1,3 +1,5 @@
+import { HabitTrackingFields } from './life/HabitTrackingFields'
+import type { HabitTracking } from '../lib/life/types'
 import { useEffect, useMemo, useState } from 'react'
 import { Lightbulb } from 'lucide-react'
 import {
@@ -37,6 +39,8 @@ type Props = {
   ) => { ok: boolean; reason?: string } | void
   /** Режим редактирования существующей привычки */
   habit?: Habit | null
+  habits?: Habit[]
+  directionLocked?: boolean
   goals?: Goal[]
   defaultGoalId?: string
   diamonds?: number
@@ -61,6 +65,8 @@ export function HabitFormModal({
   onSubmit,
   onUpdate,
   habit = null,
+  habits = [],
+  directionLocked = false,
   goals = [],
   defaultGoalId,
   diamonds = ECONOMY.START_DIAMONDS,
@@ -73,6 +79,7 @@ export function HabitFormModal({
   lockGoal = false,
   showMoodboardOption = false,
 }: Props) {
+  const [tracking, setTracking] = useState<HabitTracking>({})
   const isEdit = !!habit
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState(defaultEmoji)
@@ -101,6 +108,7 @@ export function HabitFormModal({
 
   useEffect(() => {
     if (!open) return
+    setTracking(habit ? {quantityTarget:habit.quantityTarget,unit:habit.unit,sphere:habit.sphere,category:habit.category,importance:habit.importance,tags:habit.tags,intent:habit.intent,limit:habit.limit,alternative:habit.alternative,alternativeHabitId:habit.alternativeHabitId} : {})
     if (habit) {
       setName(habit.name)
       setEmoji(habit.emoji || defaultEmoji)
@@ -181,6 +189,7 @@ export function HabitFormModal({
                 : 'border-line ring-brand/30'
             }`}
           />
+          <HabitTrackingFields value={tracking} onChange={setTracking} locked={directionLocked} habits={habits.filter(h=>h.id!==habit?.id&&h.intent!=="reduce")} />
           {highlight.name && (
             <p className="text-sm font-semibold text-danger">
               Заполни название — без него привычку не создать
@@ -554,6 +563,7 @@ export function HabitFormModal({
     list.push(reminderStep, freqStep, priorityStep, durationStep, confirmStep)
     return list
   }, [
+    tracking, habits, directionLocked, habit,
     name,
     emoji,
     goals,
@@ -610,6 +620,7 @@ export function HabitFormModal({
 
     if (isEdit && habit && onUpdate) {
       const result = onUpdate(habit.id, {
+        ...tracking,
         name: name.trim(),
         emoji,
         priority,
@@ -629,6 +640,7 @@ export function HabitFormModal({
     if (!onSubmit) return
     const result = onSubmit(
       {
+        ...tracking,
         name: name.trim(),
         emoji,
         priority,

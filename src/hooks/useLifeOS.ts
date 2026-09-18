@@ -1,3 +1,5 @@
+import { reconcileHabitRecords } from '../lib/life/habits'
+import type { HabitTracking } from '../lib/life/types'
 import { normalizeLife, syncLifeHistory, uid, dateKey } from '../lib/life/model'
 import type { LifeData, LifeFields } from '../lib/life/types'
 import { applyEnergyTransition, migrateEnergy, type EnergyLedger } from '../lib/energy'
@@ -134,7 +136,7 @@ function storageKey(userId: string): string {
   return `${STORAGE_BASE}:${userId}`
 }
 
-export type NewHabitInput = {
+export type NewHabitInput = HabitTracking & {
   name: string
   emoji: string
   priority: HabitPriority
@@ -153,7 +155,7 @@ export type NewHabitInput = {
   reminderTime?: string
 }
 
-export type UpdateHabitInput = {
+export type UpdateHabitInput = HabitTracking & {
   name: string
   emoji: string
   priority: HabitPriority
@@ -1142,7 +1144,7 @@ function loadStore(userId: string): Store {
 
 function syncQuests(habits: Habit[], existing: Quest[]): Quest[] {
   const today = todayKey()
-  const due = habits.filter((h) => isDueToday(h, today) || (isActiveToday(h, today) && h.completions[today]))
+  const due = habits.filter((h) => h.intent !== 'reduce' && (isDueToday(h, today) || (isActiveToday(h, today) && h.completions[today])))
   const byHabit = new Map(existing.map((q) => [q.habitId, q]))
 
   return due.map((h) => {
@@ -1249,7 +1251,7 @@ export function useLifeOS(userId: string | null) {
       ? (() => {
           const now = new Date()
           const base = migrateEnergy(previous, now, energyPlanIds(previous))
-          const proposed = syncLifeHistory(base, update(base), now)
+          const proposed = syncLifeHistory(base, reconcileHabitRecords(base, update(base), now), now)
           const next = applyEnergyTransition(base, proposed, now, energyPlanIds(proposed))
           return next === previous ? previous : applyAchievementEventsToStore(next, [])
         })()
@@ -1396,6 +1398,17 @@ export function useLifeOS(userId: string | null) {
     setMonth(year, month)
   }
 
+  const confirmReductionDay = (id:string,date:string,value:number) => {
+    if(date>todayKey())return
+    setStore(s=>({...s,habits:s.habits.map(h=>h.id===id&&h.intent==='reduce'&&h.limit!==undefined?{...h,records:{...h.records,[date]:{value,target:h.records?.[date]?.target??h.limit,confirmed:true}}}:h)}))
+  }
+  const recordHabitValue = (habitId: string, date: string, value: number | null, time?: string): {ok:boolean;reason?:string} => {
+    const h=store.habits.find(h=>h.id===habitId)
+    if(!h || date>todayKey() || date<h.startDate || (value!==null&&(!Number.isFinite(value)||value<0))) return {ok:false,reason:'Проверь дату и значение'}
+    setStore(s=>{const habits=s.habits.map(h=>{if(h.id!==habitId)return h;const records={...h.records};const completions={...h.completions};if(value===null){delete records[date];delete completions[date]}else{const target=records[date]?.target??h.quantityTarget??1;records[date]={value,target,confirmed:true,at:time?new Date(`${date}T${time}`).toISOString():undefined};if(h.intent!=='reduce'&&value>=target)completions[date]=true;else delete completions[date]}return {...h,records,completions}});return {...s,habits,plannerTasks:syncTaskMarks(s.plannerTasks??[],habits,date,new Date().toISOString()),quests:syncQuests(habits,s.quests),streak:globalStreak(habits)}})
+    return {ok:true}
+  }
+
   const toggleHabitDay = (
     habitId: string,
     dayIndex: number,
@@ -1408,6 +1421,7 @@ export function useLifeOS(userId: string | null) {
 
     const h = habitsAll.find((x) => x.id === habitId)
     if (!h) return { ok: false, reason: 'Привычка не найдена' }
+    if(h.intent==='reduce')return {ok:false,reason:'Запиши эпизод или подтверди итог дня в привычках'}
     const status = dayStatus(h, store.year, store.month, dayIndex)
     if (status === 'before' || status === 'after' || status === 'future') {
       return { ok: false, reason: 'Этот день недоступен' }
@@ -1657,6 +1671,7 @@ export function useLifeOS(userId: string | null) {
         }
       }
       const habit: Habit = {
+        ...input,
         id,
         name: input.name.trim(),
         emoji: input.emoji || '⭐',
@@ -1744,6 +1759,7 @@ export function useLifeOS(userId: string | null) {
     const exists = store.habits.some((h) => h.id === habitId)
     if (!exists) return { ok: false, reason: 'Привычка не найдена' }
     if (!input.name.trim()) return { ok: false, reason: 'Укажи название привычки' }
+    if(input.intent==='reduce'&&store.contracts.some(c=>c.habitId===habitId&&c.status==='active'))return {ok:false,reason:'Сначала заверши активный квест'}
     setStore((s) => ({
       ...applyAchievementEventsToStore(
         {
@@ -1752,6 +1768,7 @@ export function useLifeOS(userId: string | null) {
             h.id === habitId
               ? {
                   ...h,
+                  ...input,
                   name: input.name.trim(),
                   emoji: input.emoji || h.emoji,
                   priority: input.priority,
@@ -3969,7 +3986,7 @@ export function useLifeOS(userId: string | null) {
   }
 
   return {
-    life, updateLife, syncError,
+    life, updateLife, syncError, recordHabitValue, confirmReductionDay,
     ...store,
     goals,
     habits: habitStats,
