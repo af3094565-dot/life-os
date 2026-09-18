@@ -1,3 +1,4 @@
+import { TrackingSettings } from './components/life/TrackingSettings'
 import { useCallback, useEffect, useState } from 'react'
 import { AccountPanel } from './components/AccountPanel'
 import { ActionToast, useActionToast } from './components/ActionToast'
@@ -47,6 +48,7 @@ export default function App() {
   const state = useLifeOS(auth.user?.id ?? null)
   const [pendingShareCode, setPendingShareCode] = useState<string | null>(null)
   const [claimNotice, setClaimNotice] = useState<string | null>(null)
+  const [trackingOpen, setTrackingOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [trainingOfferOpen, setTrainingOfferOpen] = useState(false)
   const [wheelOfferOpen, setWheelOfferOpen] = useState(false)
@@ -355,6 +357,7 @@ export default function App() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <main className="workspace-main app-main-scroll flex-1 overflow-auto px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 md:p-7 md:pb-7">
+          {state.syncError && <p role="status" className="mb-3 rounded-xl bg-amber-50 p-3 text-sm">{state.syncError} <button className="underline" onClick={() => window.location.reload()}>Повторить</button></p>}
           <SectionNavigation page={page} hasSubscription={auth.hasSubscription} onNavigate={(p) => navigate(p)} />
           <div className="workspace-page-content" key={page}>
           {page === 'dashboard' && (
@@ -573,7 +576,9 @@ export default function App() {
         />
       )}
 
+      <TrackingSettings state={state} open={trackingOpen} onClose={() => setTrackingOpen(false)} />
       <AccountPanel
+        onOpenTracking={() => { setAccountOpen(false); setTrackingOpen(true) }}
         open={accountOpen}
         user={auth.user}
         onClose={() => setAccountOpen(false)}

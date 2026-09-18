@@ -1,3 +1,5 @@
+import { normalizeLife, syncLifeHistory } from '../lib/life/model'
+import type { LifeData, LifeFields } from '../lib/life/types'
 import { applyEnergyTransition, migrateEnergy, type EnergyLedger } from '../lib/energy'
 import { dayCharge } from '../lib/dayCharge'
 import { todayOverview } from '../lib/todayOverview'
@@ -211,7 +213,7 @@ export type PlannerSection = {
 
 export type PlannerTaskEnergy = 'light' | 'medium' | 'deep'
 
-export type PlannerTask = {
+export type PlannerTask = LifeFields & {
   id: string
   title: string
   note?: string
@@ -333,6 +335,8 @@ export type GoalStat = Goal & {
 }
 
 type Store = {
+  life?: LifeData
+
   energy?: EnergyLedger
   year: number
   month: number
@@ -972,6 +976,7 @@ function parseStore(raw: string): Store | null {
     )
     return {
       ...parsed,
+      life: normalizeLife(parsed.life),
       year: now.year,
       month: now.month,
       habits,
@@ -1112,6 +1117,7 @@ function loadStore(userId: string): Store {
     }
 
     const raw = localStorage.getItem(storageKey(userId))
+    if (raw && !JSON.parse(raw).life && !localStorage.getItem(`${storageKey(userId)}:before-life`)) localStorage.setItem(`${storageKey(userId)}:before-life`, raw)
     if (raw) {
       const store = parseStore(raw)
       if (store) {
@@ -1243,12 +1249,15 @@ export function useLifeOS(userId: string | null) {
       ? (() => {
           const now = new Date()
           const base = migrateEnergy(previous, now, energyPlanIds(previous))
-          const proposed = update(base)
+          const proposed = syncLifeHistory(base, update(base), now)
           const next = applyEnergyTransition(base, proposed, now, energyPlanIds(proposed))
           return next === previous ? previous : applyAchievementEventsToStore(next, [])
         })()
-      : migrateEnergy(update, new Date(), energyPlanIds(update)))
+      : syncLifeHistory(update, migrateEnergy(update, new Date(), energyPlanIds(update))))
   }
+  const life = useMemo(() => normalizeLife(store.life), [store.life])
+  const updateLife = (update: (previous: LifeData) => LifeData) => setStore(s => ({...s, life: update(normalizeLife(s.life))}))
+  const [syncError, setSyncError] = useState<string | null>(null)
   const [cloudHydrated, setCloudHydrated] = useState(() => !isCloudEnabled() || !userId)
   const skipNextCloudPush = useRef(false)
   const cloudTimer = useRef<number | null>(null)
@@ -1269,6 +1278,7 @@ export function useLifeOS(userId: string | null) {
     const gen = ++hydrateGen.current
     setCloudHydrated(false)
     ;(async () => {
+      try {
       await migrateLocalStoreIfNeeded(userId, [TESTER_USER_ID])
       const remote = await fetchCloudStore(userId)
       if (hydrateGen.current !== gen) return
@@ -1287,6 +1297,8 @@ export function useLifeOS(userId: string | null) {
         }
       }
       setCloudHydrated(true)
+      setSyncError(null)
+      } catch (error) { if (hydrateGen.current === gen) setSyncError(error instanceof Error ? error.message : 'Ошибка синхронизации') }
     })()
   }, [userId])
 
@@ -1322,7 +1334,7 @@ export function useLifeOS(userId: string | null) {
     }
     if (cloudTimer.current) window.clearTimeout(cloudTimer.current)
     cloudTimer.current = window.setTimeout(() => {
-      void pushCloudStore(userId, JSON.stringify(store))
+      void pushCloudStore(userId, JSON.stringify(store)).then(ok => setSyncError(ok ? null : 'Изменения сохранены на устройстве. Облачная синхронизация не удалась.')).catch(() => setSyncError('Изменения сохранены на устройстве. Нет связи с облаком.'))
     }, 600)
     return () => {
       if (cloudTimer.current) window.clearTimeout(cloudTimer.current)
@@ -3948,6 +3960,7 @@ export function useLifeOS(userId: string | null) {
   }
 
   return {
+    life, updateLife, syncError,
     ...store,
     goals,
     habits: habitStats,

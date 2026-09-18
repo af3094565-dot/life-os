@@ -481,3 +481,12 @@ select {
   .story-badge-footer button { min-height: 44px; }
   .story-celebration { right: 16px; bottom: calc(150px + env(safe-area-inset-bottom)); }
 }
+
+/* Life tracking extends the existing surface, spacing and controls. */
+.life-form label { display: block; font-size: 13px; color: var(--color-muted); }
+.life-form input:not([type=checkbox]):not([type=range]), .life-form select, .life-form textarea { width: 100%; min-height: 44px; margin-top: 4px; padding: 10px 12px; border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-canvas); color: var(--color-ink); }
+.life-form input:focus-visible, .life-form select:focus-visible, .life-form textarea:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+.life-button { min-height: 44px; padding: 10px 14px; border-radius: 12px; background: var(--color-brand); color: white; font-size: 13px; font-weight: 700; }
+.life-button:disabled { opacity: .45; }
+.life-button.secondary { background: var(--color-brand-soft); color: var(--color-brand); }
+.life-muted { color: var(--color-muted); font-size: 13px; }

@@ -1,3 +1,4 @@
+import { TrackingSettings } from '../components/life/TrackingSettings'
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Header } from '../components/Header'
@@ -14,6 +15,7 @@ type CalendarItem =
 type Props = { state: LifeOSState; userName: string; onNavigate: (page: PageId) => void }
 
 export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
+  const [trackingOpen, setTrackingOpen] = useState(false)
   const [view, setView] = useState<'day' | 'week' | 'month'>('month')
   const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()))
   const [selectedItem, setSelectedItem] = useState<
@@ -128,6 +130,8 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
 
   return (
     <div>
+      <TrackingSettings state={state} open={trackingOpen} onClose={() => setTrackingOpen(false)} />
+      <button className="life-button secondary mb-3" onClick={() => setTrackingOpen(true)}>Настроить отслеживание</button>
       <Header
         greeting="Календарь"
         subtitle="Календарь · когда что запланировано"

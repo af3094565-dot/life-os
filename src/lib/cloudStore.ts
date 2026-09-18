@@ -18,8 +18,7 @@ export async function fetchCloudStore(userId: string): Promise<string | null> {
     .maybeSingle()
 
   if (error) {
-    console.warn('[cloudStore] fetch failed', error.message)
-    return null
+    throw new Error('Не удалось загрузить облачные данные. Локальная копия сохранена; синхронизация приостановлена.')
   }
   if (!data) return null
   const payload = data.data

@@ -12,6 +12,7 @@ type Props = {
   onClose: () => void
   onBuy: () => void
   onLogout: () => void
+  onOpenTracking: () => void
   onOpenLifeMap: () => void
   onRestartTraining?: () => void
   onLinkTelegram?: () => Promise<{ ok: boolean; reason?: string }>
@@ -35,6 +36,7 @@ export function AccountPanel({
   onBuy,
   onLogout,
   onOpenLifeMap,
+  onOpenTracking,
   onRestartTraining,
   onLinkTelegram,
   showLifeMapCta = false,
@@ -115,6 +117,7 @@ export function AccountPanel({
           )}
         </div>
 
+        <button className="life-button secondary mt-4 w-full" onClick={onOpenTracking}>Сферы и настройки отслеживания</button>
         <div className="mt-5 grid grid-cols-2 gap-2">
           {achievementSummary && (
             <div className="rounded-xl bg-canvas px-3 py-3 ring-1 ring-line">

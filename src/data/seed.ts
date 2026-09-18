@@ -1,3 +1,4 @@
+import type { HabitTracking, LifeFields } from '../lib/life/types'
 import type { LifeAreaId } from './lifeMap'
 
 export type PageId =
@@ -16,7 +17,7 @@ export type HabitPriority = 'important' | 'urgent' | 'low'
 
 export type HabitDuration = 7 | 21 | 30 | 66 | 90 | 100 | 365
 
-export type Habit = {
+export type Habit = HabitTracking & {
   id: string
   name: string
   emoji: string
@@ -137,7 +138,7 @@ export type GoalMatrixData = {
   habits: string[][]
 }
 
-export type Goal = {
+export type Goal = LifeFields & {
   id: string
   title: string
   note?: string
