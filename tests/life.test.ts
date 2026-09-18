@@ -53,3 +53,8 @@ test('choice detection requires history and handles midnight',()=>{
  l.events=[make(0)];assert.equal(choiceCandidates(l,[h],'2026-09-18').length,0)
  l.events=Array.from({length:5},(_,i)=>make(i));assert.equal(choiceCandidates(l,[h],'2026-09-18').length,1)
 })
+test('patterns require four days and exclude overlapping sequences',()=>{
+ const l=emptyLife();for(let day=10;day<14;day++)for(let i=0;i<3;i++)l.events.push({id:`${day}-${i}`,date:`2026-09-${day}`,name:`Action ${i}`,category:`c${i}`,start:`${18+i}:00`,end:`${18+i}:30`,kind:'interval',source:'manual'})
+ assert.equal(dayPatterns(l,'2026-09-18').length,1)
+ l.events=l.events.map(e=>({...e,end:'23:00'}));assert.equal(dayPatterns(l,'2026-09-18').length,0)
+})

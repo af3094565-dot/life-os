@@ -1,3 +1,4 @@
+import { useFocusClock } from '../hooks/useFocusClock'
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft,
@@ -74,7 +75,7 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
   const [sectionError, setSectionError] = useState('')
   const [taskStep, setTaskStep] = useState(0)
   const [timer, setTimer] = useState<TimerState | null>(null)
-  const [now, setNow] = useState(Date.now())
+  const now = useFocusClock()
   const [mobileSectionId, setMobileSectionId] = useState(
     state.plannerSections[0]?.id ?? '',
   )
@@ -91,11 +92,7 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
     }
   }, [state.plannerSections, mobileSectionId])
 
-  useEffect(() => {
-    if (!timer) return
-    const id = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(id)
-  }, [timer])
+
 
   useEffect(() => {
     if (!timer) return
@@ -135,7 +132,6 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
         : 'нагрузка комфортная'
 
   const startTimer = (taskId: string) => {
-    setNow(Date.now())
     setTimer({
       taskId,
       phase: 'focus',

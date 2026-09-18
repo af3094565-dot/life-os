@@ -11,6 +11,7 @@ export type DirectionVersion = LifeFields & { at: string; name: string; goalId?:
 export type Direction = { id: string; habitIds: string[]; createdAt: string; versions: DirectionVersion[] }
 export type ChoiceSetting = { enabled: boolean; time: string; dismissedDate?: string }
 export type LifeData = {
+  activeFocus?: {name:string;habitId?:string;endsAt:number};
   version: 1; sphereNames: Record<Sphere,string>; areaSpheres: Record<string,Sphere>; indicators: Indicator[];
   events: LifeEvent[]; marks: StateMark[]; days: Record<string,DailyLog>;
   archivedHabits: import('../../data/seed').Habit[]; directions: Direction[];

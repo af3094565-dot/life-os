@@ -1,3 +1,4 @@
+import { PatternPanel } from '../components/life/Choices'
 import {
   Area,
   AreaChart,
@@ -43,6 +44,7 @@ export function ProgressPage({ state, userName, onNavigate }: Props) {
 
   return (
     <div className="pb-24 md:pb-0">
+      <PatternPanel state={state} />
       <div className="mb-5 md:hidden">
         <h1 className="text-[28px] font-extrabold tracking-tight text-ink">Статистика</h1>
         {state.streak > 0 && (

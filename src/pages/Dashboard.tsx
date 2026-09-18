@@ -1,3 +1,4 @@
+import { ChoiceMoment } from '../components/life/Choices'
 import { DayState } from '../components/life/DayState'
 import { dateKey } from '../lib/life/model'
 import { useEffect, useId, useState } from 'react'
@@ -198,6 +199,7 @@ export function Dashboard({
         diamondHistory={state.diamondHistory ?? []}
         userName={userName}
       />
+      <ChoiceMoment state={state} />
       <DayState state={state} date={dateKey()} />
 
 
