@@ -13,3 +13,13 @@ test('deleting habit archives actual history and preserves direction',()=>{
  assert.equal(removed.life?.directions.length,1)
  assert.equal(removed.life?.directions[0].versions.at(-1)?.archived,true)
 })
+import { eventPart, duration, dayEvents } from '../src/lib/life/selectors.ts'
+test('overnight interval appears on both days with one source and correct duration',()=>{
+ const e={id:'e',name:'Sleep',category:'sleep',date:'2026-09-16',start:'23:30',end:'01:00',endDate:'2026-09-17',kind:'interval',source:'manual'} as const
+ assert.equal(duration(e),90);assert.equal(duration(eventPart(e,'2026-09-16')!),30);assert.equal(duration(eventPart(e,'2026-09-17')!),60)
+ assert.equal(eventPart(e,'2026-09-18'),null)
+})
+test('task and its habit become one event; old marks get no invented time',()=>{
+ const events=dayEvents(emptyLife(),[habit],[{id:'t',title:'Task',habitId:'h',scheduledFor:'2024-01-01',completedAt:'2026-01-01T12:00:00'}],'2024-01-01')
+ assert.equal(events.length,1);assert.equal(events[0].start,undefined)
+})

@@ -105,6 +105,7 @@ export function PlannerPage({ state, userName, onNavigate }: Props) {
       const completed = timer.completedFocusSessions + 1
       const isLongBreak = completed % settings.sessionsBeforeLongBreak === 0
       state.recordFocusSession({
+        taskId: timer.taskId,
         minutes: settings.focusMinutes,
         uninterrupted: true,
       })

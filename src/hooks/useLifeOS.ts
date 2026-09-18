@@ -1,4 +1,4 @@
-import { normalizeLife, syncLifeHistory } from '../lib/life/model'
+import { normalizeLife, syncLifeHistory, uid, dateKey } from '../lib/life/model'
 import type { LifeData, LifeFields } from '../lib/life/types'
 import { applyEnergyTransition, migrateEnergy, type EnergyLedger } from '../lib/energy'
 import { dayCharge } from '../lib/dayCharge'
@@ -3894,7 +3894,16 @@ export function useLifeOS(userId: string | null) {
   const recordFocusSession = (input?: {
     minutes?: number
     uninterrupted?: boolean
+    taskId?: string
+    name?: string
+    habitId?: string
   }) => {
+    const end = new Date()
+    const minutes = Math.max(1, Math.min(180, input?.minutes ?? store.focusSettings?.focusMinutes ?? 25))
+    const start = new Date(end.getTime() - minutes * 60_000)
+    const task = store.plannerTasks?.find(t => t.id === input?.taskId)
+    const habit = store.habits.find(h => h.id === (input?.habitId ?? task?.habitId))
+    updateLife(l => ({...l, events: [...l.events, {id: uid(), name: input?.name ?? task?.title ?? "Фокус", category: habit?.category ?? "focus", date: dateKey(start), start: start.toTimeString().slice(0,5), end: end.toTimeString().slice(0,5), endDate: dateKey(end), kind: "interval", source: "focus", sourceId: task?.id, habitId: habit?.id, goalId: habit?.goalId, sphere: habit?.sphere ?? "growth"}]}))
     trackAchievementEvent({
       type: 'focus_completed',
       payload: {

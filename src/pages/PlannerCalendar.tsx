@@ -1,3 +1,4 @@
+import { DayHistory } from '../components/life/DayHistory'
 import { TrackingSettings } from '../components/life/TrackingSettings'
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -44,11 +45,14 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
       done: !!task.completedAt,
       meta: `${task.focusBlocks} блок.`,
     }))
-    const habits = state.habitsAll.flatMap((habit) => {
+    const habits = state.habitsAll.filter(h => !h.plannerTaskId).flatMap((habit) => {
       const dates = new Set<string>()
-      const daysInMonth = new Date(state.year, state.month + 1, 0).getDate()
-      for (let day = 1; day <= daysInMonth; day += 1) {
-        const key = toDateKey(new Date(state.year, state.month, day))
+      const rangeStart = new Date(`${selectedDate}T12:00:00`)
+      rangeStart.setDate(rangeStart.getDate() - 7)
+      const datesToRender = new Set<string>()
+      for (let i=0;i<21;i++) { const d = new Date(rangeStart); d.setDate(d.getDate()+i); datesToRender.add(toDateKey(d)) }
+      for (let day=1;day<=new Date(state.year,state.month+1,0).getDate();day++) datesToRender.add(toDateKey(new Date(state.year,state.month,day)))
+      for (const key of datesToRender) {
         if (isDueOnDate(habit, key) || habit.completions[key]) dates.add(key)
       }
       return Array.from(dates).map((date) => ({
@@ -71,7 +75,7 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
       meta: `цель · ${goal.progress}%`,
     }))
     return sortItems([...tasks, ...goals, ...habits])
-  }, [state.goalStats, state.habitsAll, state.month, state.plannerTasksDetailed, state.year])
+  }, [state.goalStats, state.habitsAll, state.month, state.plannerTasksDetailed, state.year, selectedDate])
 
   const itemsByDate = useMemo(() => {
     const map = new Map<string, typeof calendarItems>()
@@ -126,7 +130,7 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
     date.setDate(weekStart.getDate() + index)
     return date
   })
-  const hours = Array.from({ length: 18 }, (_, index) => index + 6)
+  const hours = Array.from({ length: 24 }, (_, index) => index)
 
   return (
     <div>
@@ -212,6 +216,8 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
               return (
                 <div
                   key={key}
+                  role="button" tabIndex={0} aria-label={`Открыть день ${key}`}
+                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedDate(key); setView("day") } }}
                   onClick={() => {
                     setSelectedDate(key)
                     setView('day')
@@ -431,11 +437,12 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
         </div>
       )}
 
+      {view === 'day' && <DayHistory state={state} date={selectedDate} />}
       {view === 'day' && (
         <Card className="animate-fade-up">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-extrabold text-ink">День</h3>
+              <h3 className="text-base font-extrabold text-ink">План на день</h3>
               <p className="mt-1 text-sm font-medium text-muted">{formatRuDate(selectedDate)}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -474,7 +481,7 @@ export function PlannerCalendarPage({ state, userName, onNavigate }: Props) {
                   <div className="space-y-2">
                     {items.length === 0 ? (
                       <div className="rounded-xl bg-canvas/60 px-3 py-3 text-sm font-medium text-muted">
-                        Свободно
+                        Нет записей плана
                       </div>
                     ) : (
                       items.map((item) => (
